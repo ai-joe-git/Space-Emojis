@@ -81,7 +81,7 @@
         canvas.width = window.innerWidth - 20;
         canvas.height = window.innerHeight - 20;
 
-        let player, enemies, boss, powerUps;
+        let player, enemies, boss, powerUps, projectiles;
         let score = 0;
         let highScore = 0;
         let level = 1;
@@ -90,13 +90,16 @@
         let isGameRunning = false;
         let isJetpackActive = false;
 
+        // Fallback storage when localStorage is not available
+        let fallbackStorage = {};
+
         function safeGetItem(key, fallback) {
             try {
                 const value = localStorage.getItem(key);
                 return value !== null ? value : fallback;
             } catch (e) {
-                console.warn("localStorage is not available. Using fallback value.");
-                return fallback;
+                console.warn("localStorage is not available. Using fallback storage.");
+                return fallbackStorage[key] || fallback;
             }
         }
 
@@ -104,7 +107,8 @@
             try {
                 localStorage.setItem(key, value);
             } catch (e) {
-                console.warn("localStorage is not available. Unable to save data.");
+                console.warn("localStorage is not available. Using fallback storage.");
+                fallbackStorage[key] = value;
             }
         }
 
@@ -160,9 +164,19 @@
 
             shoot() {
                 if (this.powerUp) {
-                    return new GameObject(this.x + this.size, this.y, this.powerUp, 20);
+                    return new Projectile(this.x + this.size, this.y, this.powerUp, 20);
                 }
                 return null;
+            }
+
+            collectPowerUp(powerUp) {
+                try {
+                    this.powerUp = powerUp.emoji;
+                    this.powerUpTimer = 300;
+                    console.log("Power-up collected:", this.powerUp);
+                } catch (error) {
+                    console.error("Error collecting power-up:", error);
+                }
             }
         }
 
@@ -202,15 +216,15 @@
             attack() {
                 switch(this.attackPattern) {
                     case 0: // Single shot
-                        return new GameObject(this.x - this.size, this.y, '🔥', 20);
+                        return new Projectile(this.x - this.size, this.y, '🔥', 20);
                     case 1: // Triple shot
                         return [
-                            new GameObject(this.x - this.size, this.y - 30, '🔥', 20),
-                            new GameObject(this.x - this.size, this.y, '🔥', 20),
-                            new GameObject(this.x - this.size, this.y + 30, '🔥', 20)
+                            new Projectile(this.x - this.size, this.y - 30, '🔥', 20),
+                            new Projectile(this.x - this.size, this.y, '🔥', 20),
+                            new Projectile(this.x - this.size, this.y + 30, '🔥', 20)
                         ];
                     case 2: // Homing missile
-                        return new GameObject(this.x - this.size, this.y, '🚀', 20);
+                        return new Projectile(this.x - this.size, this.y, '🚀', 20);
                 }
             }
         }
@@ -227,10 +241,22 @@
             }
         }
 
+        class Projectile extends GameObject {
+            constructor(x, y, emoji, size) {
+                super(x, y, emoji, size);
+                this.vx = 5; // Projectile speed
+            }
+
+            update() {
+                this.x += this.vx;
+            }
+        }
+
         function init() {
             player = new Player();
             enemies = [];
             powerUps = [];
+            projectiles = [];
             boss = null;
             score = 0;
             level = 1;
@@ -251,19 +277,23 @@
                 }
 
                 enemies = enemies.filter(enemy => {
-                    enemy.update();
-                    if (player.collision(enemy)) {
-                        gameOver();
-                        return false;
+                    if (enemy instanceof Enemy) {
+                        enemy.update();
+                        if (player.collision(enemy)) {
+                            gameOver();
+                            return false;
+                        }
+                        return enemy.x > -enemy.size;
+                    } else {
+                        console.warn("Non-Enemy object found in enemies array:", enemy);
+                        return false; // Remove non-Enemy objects
                     }
-                    return enemy.x > -enemy.size;
                 });
 
                 powerUps = powerUps.filter(powerUp => {
                     powerUp.update();
                     if (player.collision(powerUp)) {
-                        player.powerUp = powerUp.emoji;
-                        player.powerUpTimer = 300;
+                        player.collectPowerUp(powerUp);
                         return false;
                     }
                     return powerUp.x > -powerUp.size;
@@ -282,9 +312,9 @@
                 const bossAttack = boss.update();
                 if (bossAttack) {
                     if (Array.isArray(bossAttack)) {
-                        enemies.push(...bossAttack);
+                        projectiles.push(...bossAttack);
                     } else {
-                        enemies.push(bossAttack);
+                        projectiles.push(bossAttack);
                     }
                 }
 
@@ -299,9 +329,24 @@
                 }
             }
 
+            updateProjectiles();
+
             if (fuel < 100) {
                 fuel += 0.1;
             }
+        }
+
+        function updateProjectiles() {
+            projectiles = projectiles.filter(projectile => {
+                projectile.update();
+                // Check for collisions with enemies or boss
+                if (isBossLevel && boss && projectile.collision(boss)) {
+                    boss.health -= 10;
+                    return false;
+                }
+                // Remove projectile if it's off-screen
+                return projectile.x < canvas.width && projectile.x > 0;
+            });
         }
 
         function draw() {
@@ -315,6 +360,7 @@
             player.draw();
             enemies.forEach(enemy => enemy.draw());
             powerUps.forEach(powerUp => powerUp.draw());
+            projectiles.forEach(projectile => projectile.draw());
 
             if (isBossLevel && boss) {
                 boss.draw();
@@ -361,7 +407,7 @@
             if (player.powerUp) {
                 const projectile = player.shoot();
                 if (projectile) {
-                    enemies.push(projectile);
+                    projectiles.push(projectile);
                 }
             }
         }
