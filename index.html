@@ -3,449 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Dungeon Crawler RPG</title>
+    <title>Jetpack Emoji Adventure</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: Arial, sans-serif; }
-        #gameArea { 
-            position: absolute; 
-            top: 50px; 
-            left: 10px; 
-            white-space: pre; 
-            font-size: 20px; 
-            line-height: 20px;
-            border: 1px solid #fff;
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #87CEEB;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
         }
-        #ui { 
-            position: absolute; 
-            top: 10px; 
-            left: 10px; 
-            background: rgba(0,0,0,0.7); 
-            padding: 5px;
+        #gameCanvas {
+            border: 2px solid #000;
         }
-        #message { position: absolute; bottom: 10px; left: 10px; }
-        #inventory { position: absolute; top: 10px; right: 10px; }
-        #abilities { position: absolute; bottom: 40px; left: 10px; }
-        .ability-button { margin: 5px; padding: 5px 10px; }
+        #gameOver, #startScreen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 24px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        .emoji {
+            font-size: 40px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #socialShare {
+            margin-top: 20px;
+        }
+        .shareButton {
+            margin: 0 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    <div id="ui"></div>
-    <div id="gameArea"></div>
-    <div id="message"></div>
-    <div id="inventory"></div>
-    <div id="abilities"></div>
-
+    <canvas id="gameCanvas"></canvas>
+    <div id="startScreen">
+        <h1>Jetpack Emoji Adventure</h1>
+        <p>Tap or click to use jetpack and avoid enemies!</p>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Score: <span id="finalScore"></span></p>
+        <p>High Score: <span id="highScore"></span></p>
+        <button id="restartButton">Restart</button>
+        <div id="socialShare">
+            <span class="shareButton" onclick="shareScore('twitter')">🐦</span>
+            <span class="shareButton" onclick="shareScore('facebook')">📘</span>
+        </div>
+    </div>
     <script>
-        const gameArea = document.getElementById('gameArea');
-        const ui = document.getElementById('ui');
-        const messageElement = document.getElementById('message');
-        const inventoryElement = document.getElementById('inventory');
-        const abilitiesElement = document.getElementById('abilities');
-        const GRID_SIZE = 20;
-        const TILE_SIZE = 1;
-        let player, enemies, items, level, currentLevel, stairs;
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverScreen = document.getElementById('gameOver');
+        const startScreen = document.getElementById('startScreen');
+        const finalScoreSpan = document.getElementById('finalScore');
+        const highScoreSpan = document.getElementById('highScore');
+        const restartButton = document.getElementById('restartButton');
+        const startButton = document.getElementById('startButton');
 
-        const classes = {
-            Warrior: {
-                icon: '🛡️',
-                baseStats: { hp: 120, maxHp: 120, attack: 15, defense: 10, speed: 1, mana: 50, maxMana: 50 },
-                abilities: [
-                    { name: 'Slash', icon: '🗡️', damage: 20, manaCost: 5 },
-                    { name: 'Shield Bash', icon: '🛡️', damage: 15, defense: 5, manaCost: 10 },
-                ]
-            },
-            Mage: {
-                icon: '🧙',
-                baseStats: { hp: 80, maxHp: 80, attack: 20, defense: 5, speed: 1, mana: 100, maxMana: 100 },
-                abilities: [
-                    { name: 'Fireball', icon: '🔥', damage: 25, manaCost: 15 },
-                    { name: 'Frost Nova', icon: '❄️', damage: 15, slow: 2, manaCost: 20 },
-                ]
-            },
-            Rogue: {
-                icon: '🥷',
-                baseStats: { hp: 100, maxHp: 100, attack: 12, defense: 7, speed: 2, mana: 75, maxMana: 75 },
-                abilities: [
-                    { name: 'Backstab', icon: '🗡️', damage: 30, manaCost: 10 },
-                    { name: 'Smoke Bomb', icon: '💨', defense: 10, manaCost: 15 },
-                ]
-            }
-        };
+        canvas.width = window.innerWidth - 20;
+        canvas.height = window.innerHeight - 20;
 
-        const classAbilities = {
-            Warrior: [
-                { name: 'Whirlwind', icon: '🌪️', damage: 30, aoe: true, manaCost: 25 },
-                { name: 'Fortify', icon: '🏰', defense: 15, manaCost: 20 },
-            ],
-            Mage: [
-                { name: 'Lightning Bolt', icon: '⚡', damage: 35, manaCost: 30 },
-                { name: 'Arcane Barrier', icon: '🔮', defense: 20, manaCost: 25 },
-            ],
-            Rogue: [
-                { name: 'Poison Dagger', icon: '🗡️', damage: 20, dot: 10, manaCost: 20 },
-                { name: 'Shadow Step', icon: '👥', speed: 3, manaCost: 25 },
-            ]
-        };
+        let player, enemies, boss, powerUps;
+        let score = 0;
+        let highScore = 0;
+        let level = 1;
+        let fuel = 100;
+        let isBossLevel = false;
+        let isGameRunning = false;
+        let isJetpackActive = false;
 
-        const itemTypes = [
-            { name: 'Health Potion', icon: '🧪', effect: { hp: 30 } },
-            { name: 'Mana Potion', icon: '🧪', effect: { mana: 30 } },
-            { name: 'Strength Potion', icon: '🧪', effect: { attack: 5 }, duration: 5 },
-            { name: 'Defense Potion', icon: '🧪', effect: { defense: 5 }, duration: 5 },
-            { name: 'Speed Potion', icon: '🧪', effect: { speed: 1 }, duration: 5 },
-        ];
-
-        function initializeGame() {
-            currentLevel = 1;
-            
-            let classChoice = prompt(`Choose your class:\n1. Warrior ${classes.Warrior.icon}\n2. Mage ${classes.Mage.icon}\n3. Rogue ${classes.Rogue.icon}`);
-            let selectedClass;
-            switch(classChoice) {
-                case '1': selectedClass = 'Warrior'; break;
-                case '2': selectedClass = 'Mage'; break;
-                case '3': selectedClass = 'Rogue'; break;
-                default: selectedClass = 'Warrior';
-            }
-            
-            player = {
-                ...classes[selectedClass].baseStats,
-                x: 0, y: 0,
-                level: 1,
-                xp: 0,
-                class: selectedClass,
-                appearance: classes[selectedClass].icon,
-                abilities: [...classes[selectedClass].abilities],
-                inventory: [],
-                gold: 0,
-                buffs: []
-            };
-            
-            createAbilityButtons();
-            initializeLevel();
-        }
-
-        function initializeLevel() {
-            gameArea.textContent = '';
-
-            level = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill('🟫'));
-            for (let i = 0; i < GRID_SIZE; i++) {
-                level[0][i] = level[GRID_SIZE-1][i] = level[i][0] = level[i][GRID_SIZE-1] = '🧱';
-            }
-
-            for (let i = 0; i < 50; i++) {
-                let x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                let y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                level[y][x] = '🧱';
-            }
-
-            player.x = 1;
-            player.y = 1;
-            level[player.y][player.x] = player.appearance;
-
-            enemies = [];
-            for (let i = 0; i < 5 + currentLevel; i++) {
-                let x, y;
-                do {
-                    x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                    y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
-                level[y][x] = '👾';
-                enemies.push({ 
-                    x, y, 
-                    hp: 30 + currentLevel * 5, 
-                    attack: 5 + currentLevel,
-                    defense: 2 + Math.floor(currentLevel / 2)
-                });
-            }
-
-            items = [];
-            for (let i = 0; i < 3; i++) {
-                let x, y;
-                do {
-                    x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                    y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
-                let item = {...itemTypes[Math.floor(Math.random() * itemTypes.length)]};
-                level[y][x] = item.icon;
-                items.push({ ...item, x, y });
-            }
-
-            // Add gold
-            for (let i = 0; i < 2; i++) {
-                let x, y;
-                do {
-                    x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                    y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
-                level[y][x] = '💰';
-                items.push({ name: 'Gold', icon: '💰', x, y, amount: Math.floor(Math.random() * 20) + 10 });
-            }
-
-            // Place stairs
-            stairs = { x: 0, y: 0 };
-            do {
-                stairs.x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                stairs.y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-            } while (level[stairs.y][stairs.x] !== '🟫');
-            level[stairs.y][stairs.x] = '🚪';
-
-            renderLevel();
-            updateUI();
-        }
-
-        function renderLevel() {
-            gameArea.textContent = level.map(row => row.join('')).join('\n');
-        }
-
-        function updateUI() {
-            ui.innerHTML = `
-                Level: ${currentLevel} | 
-                Class: ${player.class} ${classes[player.class].icon} | 
-                HP: ${player.hp}/${player.maxHp} | 
-                Mana: ${player.mana}/${player.maxMana} | 
-                XP: ${player.xp}/${player.level * 20} | 
-                Attack: ${player.attack} | 
-                Defense: ${player.defense} | 
-                Speed: ${player.speed} | 
-                Gold: ${player.gold}
-            `;
-
-            inventoryElement.innerHTML = 'Inventory: ' + player.inventory.map(item => item.icon).join(' ');
-
-            // Display active buffs
-            let buffDisplay = player.buffs.map(buff => `${buff.name}: ${buff.duration} turns`).join(', ');
-            if (buffDisplay) {
-                ui.innerHTML += '<br>Active Buffs: ' + buffDisplay;
+        function safeGetItem(key, fallback) {
+            try {
+                const value = localStorage.getItem(key);
+                return value !== null ? value : fallback;
+            } catch (e) {
+                console.warn("localStorage is not available. Using fallback value.");
+                return fallback;
             }
         }
 
-        function showMessage(msg) {
-            messageElement.textContent = msg;
-            setTimeout(() => messageElement.textContent = '', 3000);
+        function safeSetItem(key, value) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                console.warn("localStorage is not available. Unable to save data.");
+            }
         }
 
-        function movePlayer(dx, dy) {
-            let newX = player.x + dx;
-            let newY = player.y + dy;
+        highScore = parseInt(safeGetItem('highScore', '0'), 10);
 
-            if (newX === stairs.x && newY === stairs.y) {
-                currentLevel++;
-                showMessage(`Descending to level ${currentLevel}...`);
-                setTimeout(initializeLevel, 1000);
-                return;
+        class GameObject {
+            constructor(x, y, emoji, size) {
+                this.x = x;
+                this.y = y;
+                this.emoji = emoji;
+                this.size = size;
             }
 
-            if (level[newY][newX] === '🟫' || level[newY][newX] === '💰' || level[newY][newX] === '🧪') {
-                level[player.y][player.x] = '🟫';
-                player.x = newX;
-                player.y = newY;
-
-                // Item pickup
-                let item = items.find(item => item.x === player.x && item.y === player.y);
-                if (item) {
-                    if (item.name === 'Gold') {
-                        player.gold += item.amount;
-                        showMessage(`Picked up ${item.amount} gold!`);
-                    } else {
-                        player.inventory.push(item);
-                        showMessage(`Picked up ${item.name}!`);
-                    }
-                    items = items.filter(i => i !== item);
-                }
-
-                level[player.y][player.x] = player.appearance;
+            draw() {
+                ctx.font = `${this.size}px Arial`;
+                ctx.fillText(this.emoji, this.x, this.y);
             }
 
-            // Enemy movement and combat
-            enemies.forEach(enemy => {
-                if (Math.abs(enemy.x - player.x) <= 1 && Math.abs(enemy.y - player.y) <= 1) {
-                    combat(enemy);
+            collision(other) {
+                return Math.abs(this.x - other.x) < this.size / 2 + other.size / 2 &&
+                       Math.abs(this.y - other.y) < this.size / 2 + other.size / 2;
+            }
+        }
+
+        class Player extends GameObject {
+            constructor() {
+                super(50, canvas.height / 2, '🚀', 40);
+                this.vy = 0;
+                this.powerUp = null;
+                this.powerUpTimer = 0;
+            }
+
+            update() {
+                if (isJetpackActive && fuel > 0) {
+                    this.vy -= 0.5;
+                    fuel -= 0.5;
                 } else {
-                    moveEnemy(enemy);
+                    this.vy += 0.3;
                 }
-            });
 
-            // Update buffs
-            player.buffs = player.buffs.filter(buff => {
-                buff.duration--;
-                if (buff.duration <= 0) {
-                    // Remove buff effect
-                    Object.keys(buff.effect).forEach(stat => {
-                        player[stat] -= buff.effect[stat];
-                    });
-                    return false;
+                this.vy = Math.max(-5, Math.min(5, this.vy));
+                this.y += this.vy;
+                
+                if (this.y < 0) this.y = 0;
+                if (this.y > canvas.height) this.y = canvas.height;
+
+                if (this.powerUp && this.powerUpTimer > 0) {
+                    this.powerUpTimer--;
+                } else if (this.powerUpTimer <= 0) {
+                    this.powerUp = null;
                 }
-                return true;
-            });
-
-            // Regenerate mana
-            player.mana = Math.min(player.maxMana, player.mana + 1);
-
-            // Check if level is cleared
-            if (enemies.length === 0) {
-                showMessage(`All enemies defeated! Find the stairs (🚪) to proceed to the next level.`);
             }
 
-            renderLevel();
-            updateUI();
-        }
-
-        function moveEnemy(enemy) {
-            let dx = Math.sign(player.x - enemy.x);
-            let dy = Math.sign(player.y - enemy.y);
-            let newX = enemy.x + dx;
-            let newY = enemy.y + dy;
-
-            if (level[newY][newX] === '🟫') {
-                level[enemy.y][enemy.x] = '🟫';
-                enemy.x = newX;
-                enemy.y = newY;
-                level[enemy.y][enemy.x] = '👾';
+            shoot() {
+                if (this.powerUp) {
+                    return new GameObject(this.x + this.size, this.y, this.powerUp, 20);
+                }
+                return null;
             }
         }
 
-        function combat(enemy) {
-            let playerDamage = Math.max(0, player.attack - enemy.defense);
-            enemy.hp -= playerDamage;
-            showMessage(`You attack for ${playerDamage} damage!`);
+        class Enemy extends GameObject {
+            constructor() {
+                const types = ['👾', '👻', '🦹'];
+                super(canvas.width, Math.random() * canvas.height, types[Math.floor(Math.random() * types.length)], 30);
+                this.vx = -2 - Math.random() * 2;
+                this.vy = Math.random() * 2 - 1;
+            }
 
-            if (enemy.hp <= 0) {
-                showMessage('Enemy defeated!');
-                level[enemy.y][enemy.x] = '🟫';
-                enemies = enemies.filter(e => e !== enemy);
-                player.xp += 10;
-                if (player.xp >= player.level * 20) {
-                    levelUp();
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            }
+        }
+
+        class Boss extends GameObject {
+            constructor() {
+                const types = ['👹', '🐉', '🦑'];
+                super(canvas.width - 100, canvas.height / 2, types[Math.floor(Math.random() * types.length)], 60);
+                this.health = 100;
+                this.attackTimer = 0;
+                this.attackPattern = Math.floor(Math.random() * 3);
+            }
+
+            update() {
+                this.attackTimer++;
+                if (this.attackTimer >= 60) {
+                    this.attackTimer = 0;
+                    return this.attack();
+                }
+                return null;
+            }
+
+            attack() {
+                switch(this.attackPattern) {
+                    case 0: // Single shot
+                        return new GameObject(this.x - this.size, this.y, '🔥', 20);
+                    case 1: // Triple shot
+                        return [
+                            new GameObject(this.x - this.size, this.y - 30, '🔥', 20),
+                            new GameObject(this.x - this.size, this.y, '🔥', 20),
+                            new GameObject(this.x - this.size, this.y + 30, '🔥', 20)
+                        ];
+                    case 2: // Homing missile
+                        return new GameObject(this.x - this.size, this.y, '🚀', 20);
+                }
+            }
+        }
+
+        class PowerUp extends GameObject {
+            constructor() {
+                const powerUps = ['🔫', '❄️', '🔥', '🛡️', '⚡'];
+                super(canvas.width, Math.random() * canvas.height, powerUps[Math.floor(Math.random() * powerUps.length)], 30);
+                this.vx = -1;
+            }
+
+            update() {
+                this.x += this.vx;
+            }
+        }
+
+        function init() {
+            player = new Player();
+            enemies = [];
+            powerUps = [];
+            boss = null;
+            score = 0;
+            level = 1;
+            fuel = 100;
+            isBossLevel = false;
+        }
+
+        function update() {
+            player.update();
+
+            if (!isBossLevel) {
+                if (Math.random() < 0.02) {
+                    enemies.push(new Enemy());
+                }
+
+                if (Math.random() < 0.005) {
+                    powerUps.push(new PowerUp());
+                }
+
+                enemies = enemies.filter(enemy => {
+                    enemy.update();
+                    if (player.collision(enemy)) {
+                        gameOver();
+                        return false;
+                    }
+                    return enemy.x > -enemy.size;
+                });
+
+                powerUps = powerUps.filter(powerUp => {
+                    powerUp.update();
+                    if (player.collision(powerUp)) {
+                        player.powerUp = powerUp.emoji;
+                        player.powerUpTimer = 300;
+                        return false;
+                    }
+                    return powerUp.x > -powerUp.size;
+                });
+
+                score++;
+
+                if (score % 1000 === 0) {
+                    level++;
+                    if (level % 10 === 0) {
+                        isBossLevel = true;
+                        boss = new Boss();
+                    }
                 }
             } else {
-                let enemyDamage = Math.max(1, enemy.attack - player.defense);
-                player.hp -= enemyDamage;
-                showMessage(`Enemy attacks for ${enemyDamage} damage!`);
+                const bossAttack = boss.update();
+                if (bossAttack) {
+                    if (Array.isArray(bossAttack)) {
+                        enemies.push(...bossAttack);
+                    } else {
+                        enemies.push(bossAttack);
+                    }
+                }
 
-                if (player.hp <= 0) {
-                    alert('Game Over! You died.');
-                    initializeGame();
+                if (player.collision(boss)) {
+                    gameOver();
+                }
+
+                if (boss.health <= 0) {
+                    isBossLevel = false;
+                    boss = null;
+                    score += 1000;
                 }
             }
 
-            updateUI();
-            renderLevel();
+            if (fuel < 100) {
+                fuel += 0.1;
+            }
         }
 
-function levelUp() {
-    player.level++;
-    player.maxHp += 20;
-    player.hp = player.maxHp;
-    player.maxMana += 10;
-    player.mana = player.maxMana;
-    player.attack += 2;
-    player.defense += 1;
-    player.xp = 0;
+        function draw() {
+            // Create gradient background
+            let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, "#87CEEB");  // Sky Blue
+            gradient.addColorStop(1, "#E0F6FF");  // Light Blue
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    showMessage(`🎉 Level up! You are now level ${player.level}.`);
+            player.draw();
+            enemies.forEach(enemy => enemy.draw());
+            powerUps.forEach(powerUp => powerUp.draw());
 
-    if (player.level % 3 === 0 && player.abilities.length < 6) {
-        let availableAbilities = classAbilities[player.class].filter(a => !player.abilities.some(pa => pa.name === a.name));
-        if (availableAbilities.length > 0) {
-            let newAbility = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
-            player.abilities.push(newAbility);
-            showMessage(`You learned a new ability: ${newAbility.name}!`);
-            createAbilityButtons();
-        }
-    }
-}
-
-        function useItem(item) {
-            if (item.effect.hp) {
-                player.hp = Math.min(player.maxHp, player.hp + item.effect.hp);
-                showMessage(`You used ${item.name} and restored ${item.effect.hp} HP.`);
-            } else if (item.effect.mana) {
-                player.mana = Math.min(player.maxMana, player.mana + item.effect.mana);
-                showMessage(`You used ${item.name} and restored ${item.effect.mana} Mana.`);
-            } else {
-                // Apply buff
-                player.buffs.push({
-                    name: item.name,
-                    effect: item.effect,
-                    duration: item.duration
-                });
-                Object.keys(item.effect).forEach(stat => {
-                    player[stat] += item.effect[stat];
-                });
-                showMessage(`You used ${item.name} and gained a temporary buff!`);
+            if (isBossLevel && boss) {
+                boss.draw();
             }
-            player.inventory = player.inventory.filter(i => i !== item);
-            updateUI();
+
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+            ctx.fillText(`Level: ${level}`, 10, 60);
+            ctx.fillText(`Fuel: ${Math.round(fuel)}`, 10, 90);
+
+            if (player.powerUp) {
+                ctx.fillText(`Power-up: ${player.powerUp}`, 10, 120);
+            }
         }
 
-        function createAbilityButtons() {
-            abilitiesElement.innerHTML = '';
-            player.abilities.forEach(ability => {
-                let button = document.createElement('button');
-                button.textContent = `${ability.icon} ${ability.name}`;
-                button.classList.add('ability-button');
-                button.onclick = () => useAbility(ability);
-                abilitiesElement.appendChild(button);
-            });
+        function gameLoop() {
+            if (isGameRunning) {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
         }
 
-        function useAbility(ability) {
-            if (player.mana < ability.manaCost) {
-                showMessage("Not enough mana!");
-                return;
+        function gameOver() {
+            isGameRunning = false;
+            gameOverScreen.style.display = 'block';
+            finalScoreSpan.textContent = score;
+            if (score > highScore) {
+                highScore = score;
+                safeSetItem('highScore', highScore.toString());
             }
-
-            player.mana -= ability.manaCost;
-
-            if (ability.damage) {
-                enemies.forEach(enemy => {
-                    if (Math.abs(enemy.x - player.x) <= 1 && Math.abs(enemy.y - player.y) <= 1) {
-                        enemy.hp -= ability.damage;
-                        showMessage(`${ability.name} deals ${ability.damage} damage to enemy!`);
-                        if (enemy.hp <= 0) {
-                            showMessage('Enemy defeated!');
-                            level[enemy.y][enemy.x] = '🟫';
-                            enemies = enemies.filter(e => e !== enemy);
-                            player.xp += 10;
-                            if (player.xp >= player.level * 20) {
-                                levelUp();
-                            }
-                        }
-                    }
-                });
-            }
-
-            if (ability.defense) {
-                player.defense += ability.defense;
-                setTimeout(() => player.defense -= ability.defense, 3000);
-                showMessage(`${ability.name} increases your defense temporarily!`);
-            }
-
-            if (ability.speed) {
-                player.speed += ability.speed;
-                setTimeout(() => player.speed -= ability.speed, 3000);
-                showMessage(`${ability.name} increases your speed temporarily!`);
-            }
-
-            updateUI();
-            renderLevel();
+            highScoreSpan.textContent = highScore;
         }
 
-        document.addEventListener('keydown', (e) => {
-            switch(e.key) {
-                case 'ArrowUp': movePlayer(0, -1); break;
-                case 'ArrowDown': movePlayer(0, 1); break;
-                case 'ArrowLeft': movePlayer(-1, 0); break;
-                case 'ArrowRight': movePlayer(1, 0); break;
-                case ' ': 
-                    if (player.inventory.length > 0) {
-                        useItem(player.inventory[0]);
-                    }
-                    break;
+        function handleInput(e) {
+            e.preventDefault();
+            isJetpackActive = true;
+        }
+
+        function handleInputEnd(e) {
+            e.preventDefault();
+            isJetpackActive = false;
+            if (player.powerUp) {
+                const projectile = player.shoot();
+                if (projectile) {
+                    enemies.push(projectile);
+                }
             }
+        }
+
+        function shareScore(platform) {
+            const text = `I scored ${score} points in Jetpack Emoji Adventure! Can you beat my score?`;
+            const url = encodeURIComponent(window.location.href);
+            let shareUrl;
+
+            if (platform === 'twitter') {
+                shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${url}`;
+            } else if (platform === 'facebook') {
+                shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${encodeURIComponent(text)}`;
+            }
+
+            window.open(shareUrl, '_blank');
+        }
+
+        canvas.addEventListener('mousedown', handleInput);
+        canvas.addEventListener('mouseup', handleInputEnd);
+        canvas.addEventListener('touchstart', handleInput);
+        canvas.addEventListener('touchend', handleInputEnd);
+
+        restartButton.addEventListener('click', () => {
+            gameOverScreen.style.display = 'none';
+            init();
+            isGameRunning = true;
+            requestAnimationFrame(gameLoop);
         });
 
-        initializeGame();
+        startButton.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            init();
+            isGameRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        // Show start screen
+        startScreen.style.display = 'block';
     </script>
 </body>
 </html>
