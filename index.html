@@ -5,43 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dungeon Crawler RPG</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: Arial, sans-serif; }
-        #gameArea { width: 100vw; height: 100vh; }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; }
-        #message { position: absolute; bottom: 10px; left: 10px; color: white; }
+        body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: Arial, sans-serif; }
+        #gameArea { white-space: pre; font-size: 20px; line-height: 20px; }
+        #ui { position: absolute; top: 10px; left: 10px; }
+        #message { position: absolute; bottom: 10px; left: 10px; }
     </style>
 </head>
 <body>
-    <svg id="gameArea" viewBox="0 0 1000 1000">
-        <defs>
-            <g id="wall">
-                <rect width="50" height="50" fill="#555" />
-                <line x1="0" y1="0" x2="50" y2="50" stroke="#666" stroke-width="2" />
-                <line x1="50" y1="0" x2="0" y2="50" stroke="#666" stroke-width="2" />
-            </g>
-            <g id="floor">
-                <rect width="50" height="50" fill="#333" />
-                <circle cx="25" cy="25" r="5" fill="#444" />
-            </g>
-            <g id="player">
-                <circle cx="25" cy="25" r="20" fill="#ff0" />
-                <circle cx="18" cy="20" r="4" fill="#000" />
-                <circle cx="32" cy="20" r="4" fill="#000" />
-                <path d="M15 30 Q25 40 35 30" fill="none" stroke="#000" stroke-width="2" />
-            </g>
-            <g id="enemy">
-                <rect x="5" y="5" width="40" height="40" fill="#f00" rx="5" ry="5" />
-                <circle cx="18" cy="20" r="4" fill="#000" />
-                <circle cx="32" cy="20" r="4" fill="#000" />
-                <path d="M15 35 Q25 25 35 35" fill="none" stroke="#000" stroke-width="2" />
-            </g>
-            <g id="healthPotion">
-                <path d="M20 10 L30 10 L35 20 L25 40 L15 20 Z" fill="#0f0" />
-                <circle cx="25" cy="25" r="5" fill="#fff" />
-            </g>
-        </defs>
-    </svg>
     <div id="ui"></div>
+    <div id="gameArea"></div>
     <div id="message"></div>
 
     <script>
@@ -49,7 +21,7 @@
         const ui = document.getElementById('ui');
         const messageElement = document.getElementById('message');
         const GRID_SIZE = 20;
-        const TILE_SIZE = 50;
+        const TILE_SIZE = 1; // Not used but kept for reference
         let player, enemies, items, level, currentLevel;
 
         const classes = {
@@ -94,15 +66,6 @@
             ]
         };
 
-        function createGameObject(type, x, y) {
-            const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-            use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `#${type}`);
-            use.setAttribute('x', x * TILE_SIZE);
-            use.setAttribute('y', y * TILE_SIZE);
-            gameArea.appendChild(use);
-            return use;
-        }
-
         function initializeGame() {
             currentLevel = 1;
             
@@ -130,34 +93,25 @@
 
         function initializeLevel() {
             // Clear previous game state
-            while (gameArea.lastChild) {
-                gameArea.removeChild(gameArea.lastChild);
-            }
+            gameArea.textContent = '';
 
             // Generate level
-            level = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill('floor'));
+            level = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill('🟫'));
             for (let i = 0; i < GRID_SIZE; i++) {
-                level[0][i] = level[GRID_SIZE-1][i] = level[i][0] = level[i][GRID_SIZE-1] = 'wall';
+                level[0][i] = level[GRID_SIZE-1][i] = level[i][0] = level[i][GRID_SIZE-1] = '🧱';
             }
 
             // Place walls
             for (let i = 0; i < 50; i++) {
                 let x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                 let y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                level[y][x] = 'wall';
-            }
-
-            // Render level
-            for (let y = 0; y < GRID_SIZE; y++) {
-                for (let x = 0; x < GRID_SIZE; x++) {
-                    createGameObject(level[y][x], x, y);
-                }
+                level[y][x] = '🧱';
             }
 
             // Place player
             player.x = 1;
             player.y = 1;
-            player.element = createGameObject('player', 1, 1);
+            level[player.y][player.x] = player.appearance;
 
             // Place enemies
             enemies = [];
@@ -166,13 +120,13 @@
                 do {
                     x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                     y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                } while (level[y][x] !== 'floor' || (x === player.x && y === player.y));
+                } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
+                level[y][x] = '👾';
                 enemies.push({ 
                     x, y, 
                     hp: 30 + currentLevel * 5, 
                     attack: 5 + currentLevel,
-                    defense: 2 + Math.floor(currentLevel / 2),
-                    element: createGameObject('enemy', x, y) 
+                    defense: 2 + Math.floor(currentLevel / 2)
                 });
             }
 
@@ -183,11 +137,17 @@
                 do {
                     x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                     y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
-                } while (level[y][x] !== 'floor' || (x === player.x && y === player.y));
-                items.push({ x, y, element: createGameObject('healthPotion', x, y) });
+                } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
+                level[y][x] = '🧪';
+                items.push({ x, y });
             }
 
+            renderLevel();
             updateUI();
+        }
+
+        function renderLevel() {
+            gameArea.textContent = level.map(row => row.join('')).join('\n');
         }
 
         function updateUI() {
@@ -211,17 +171,17 @@
             let newX = player.x + dx;
             let newY = player.y + dy;
 
-            if (level[newY][newX] === 'floor') {
+            if (level[newY][newX] === '🟫') {
+                level[player.y][player.x] = '🟫';
                 player.x = newX;
                 player.y = newY;
-                player.element.setAttribute('x', player.x * TILE_SIZE);
-                player.element.setAttribute('y', player.y * TILE_SIZE);
+                level[player.y][player.x] = player.appearance;
             }
 
             // Check for item pickup
             items = items.filter(item => {
                 if (item.x === player.x && item.y === player.y) {
-                    gameArea.removeChild(item.element);
+                    level[player.y][player.x] = player.appearance;
                     player.hp = Math.min(player.maxHp, player.hp + 20);
                     showMessage('Health potion picked up! +20 HP');
                     updateUI();
@@ -243,6 +203,8 @@
                 showMessage(`Level ${currentLevel} completed! Starting next level...`);
                 setTimeout(initializeLevel, 2000);
             }
+
+            renderLevel();
         }
 
         function combat(enemy) {
@@ -269,7 +231,7 @@
 
             if (enemy.hp <= 0) {
                 showMessage('Enemy defeated!');
-                gameArea.removeChild(enemy.element);
+                level[enemy.y][enemy.x] = '🟫';
                 enemies = enemies.filter(e => e !== enemy);
                 player.xp += 10;
                 if (player.xp >= player.level * 20) {
@@ -287,6 +249,7 @@
             }
 
             updateUI();
+            renderLevel();
         }
 
         function levelUp() {
