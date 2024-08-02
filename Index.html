@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dungeon Crawler RPG</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+        #gameArea { width: 100vw; height: 100vh; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; }
+        #message { position: absolute; bottom: 10px; left: 10px; color: white; }
+    </style>
+</head>
+<body>
+    <svg id="gameArea" viewBox="0 0 1000 1000">
+        <defs>
+            <g id="wall">
+                <rect width="50" height="50" fill="#555" />
+                <line x1="0" y1="0" x2="50" y2="50" stroke="#666" stroke-width="2" />
+                <line x1="50" y1="0" x2="0" y2="50" stroke="#666" stroke-width="2" />
+            </g>
+            <g id="floor">
+                <rect width="50" height="50" fill="#333" />
+                <circle cx="25" cy="25" r="5" fill="#444" />
+            </g>
+            <g id="player">
+                <circle cx="25" cy="25" r="20" fill="#ff0" />
+                <circle cx="18" cy="20" r="4" fill="#000" />
+                <circle cx="32" cy="20" r="4" fill="#000" />
+                <path d="M15 30 Q25 40 35 30" fill="none" stroke="#000" stroke-width="2" />
+            </g>
+            <g id="enemy">
+                <rect x="5" y="5" width="40" height="40" fill="#f00" rx="5" ry="5" />
+                <circle cx="18" cy="20" r="4" fill="#000" />
+                <circle cx="32" cy="20" r="4" fill="#000" />
+                <path d="M15 35 Q25 25 35 35" fill="none" stroke="#000" stroke-width="2" />
+            </g>
+            <g id="healthPotion">
+                <path d="M20 10 L30 10 L35 20 L25 40 L15 20 Z" fill="#0f0" />
+                <circle cx="25" cy="25" r="5" fill="#fff" />
+            </g>
+        </defs>
+    </svg>
+    <div id="ui"></div>
+    <div id="message"></div>
+
+    <script>
+        const gameArea = document.getElementById('gameArea');
+        const ui = document.getElementById('ui');
+        const messageElement = document.getElementById('message');
+        const GRID_SIZE = 20;
+        const TILE_SIZE = 50;
+        let player, enemies, items, level, currentLevel;
+
+        const classes = {
+            Warrior: {
+                icon: '🛡️',
+                baseStats: { hp: 120, maxHp: 120, attack: 15, defense: 10, speed: 1 },
+                abilities: [
+                    { name: 'Slash', icon: '🗡️', damage: 20 },
+                    { name: 'Shield Bash', icon: '🛡️', damage: 15, defense: 5 },
+                ]
+            },
+            Mage: {
+                icon: '🧙',
+                baseStats: { hp: 80, maxHp: 80, attack: 20, defense: 5, speed: 1 },
+                abilities: [
+                    { name: 'Fireball', icon: '🔥', damage: 25 },
+                    { name: 'Frost Nova', icon: '❄️', damage: 15, slow: 2 },
+                ]
+            },
+            Rogue: {
+                icon: '🥷',
+                baseStats: { hp: 100, maxHp: 100, attack: 12, defense: 7, speed: 2 },
+                abilities: [
+                    { name: 'Backstab', icon: '🗡️', damage: 30 },
+                    { name: 'Smoke Bomb', icon: '💨', defense: 10 },
+                ]
+            }
+        };
+
+        const classAbilities = {
+            Warrior: [
+                { name: 'Whirlwind', icon: '🌪️', damage: 30, aoe: true },
+                { name: 'Fortify', icon: '🏰', defense: 15 },
+            ],
+            Mage: [
+                { name: 'Lightning Bolt', icon: '⚡', damage: 35 },
+                { name: 'Arcane Barrier', icon: '🔮', defense: 20 },
+            ],
+            Rogue: [
+                { name: 'Poison Dagger', icon: '🗡️', damage: 20, dot: 10 },
+                { name: 'Shadow Step', icon: '👥', speed: 3 },
+            ]
+        };
+
+        function createGameObject(type, x, y) {
+            const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+            use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `#${type}`);
+            use.setAttribute('x', x * TILE_SIZE);
+            use.setAttribute('y', y * TILE_SIZE);
+            gameArea.appendChild(use);
+            return use;
+        }
+
+        function initializeGame() {
+            currentLevel = 1;
+            
+            let classChoice = prompt(`Choose your class:\n1. Warrior ${classes.Warrior.icon}\n2. Mage ${classes.Mage.icon}\n3. Rogue ${classes.Rogue.icon}`);
+            let selectedClass;
+            switch(classChoice) {
+                case '1': selectedClass = 'Warrior'; break;
+                case '2': selectedClass = 'Mage'; break;
+                case '3': selectedClass = 'Rogue'; break;
+                default: selectedClass = 'Warrior';
+            }
+            
+            player = {
+                ...classes[selectedClass].baseStats,
+                x: 0, y: 0,
+                level: 1,
+                xp: 0,
+                class: selectedClass,
+                appearance: classes[selectedClass].icon,
+                abilities: [...classes[selectedClass].abilities]
+            };
+            
+            initializeLevel();
+        }
+
+        function initializeLevel() {
+            // Clear previous game state
+            while (gameArea.lastChild) {
+                gameArea.removeChild(gameArea.lastChild);
+            }
+
+            // Generate level
+            level = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill('floor'));
+            for (let i = 0; i < GRID_SIZE; i++) {
+                level[0][i] = level[GRID_SIZE-1][i] = level[i][0] = level[i][GRID_SIZE-1] = 'wall';
+            }
+
+            // Place walls
+            for (let i = 0; i < 50; i++) {
+                let x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                let y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                level[y][x] = 'wall';
+            }
+
+            // Render level
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    createGameObject(level[y][x], x, y);
+                }
+            }
+
+            // Place player
+            player.x = 1;
+            player.y = 1;
+            player.element = createGameObject('player', 1, 1);
+
+            // Place enemies
+            enemies = [];
+            for (let i = 0; i < 5; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                    y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                } while (level[y][x] !== 'floor' || (x === player.x && y === player.y));
+                enemies.push({ 
+                    x, y, 
+                    hp: 30 + currentLevel * 5, 
+                    attack: 5 + currentLevel,
+                    defense: 2 + Math.floor(currentLevel / 2),
+                    element: createGameObject('enemy', x, y) 
+                });
+            }
+
+            // Place items
+            items = [];
+            for (let i = 0; i < 3; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                    y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                } while (level[y][x] !== 'floor' || (x === player.x && y === player.y));
+                items.push({ x, y, element: createGameObject('healthPotion', x, y) });
+            }
+
+            updateUI();
+        }
+
+        function updateUI() {
+            ui.innerHTML = `
+                Level: ${currentLevel} | 
+                Class: ${player.class} ${classes[player.class].icon} | 
+                HP: ${player.hp}/${player.maxHp} | 
+                XP: ${player.xp}/${player.level * 20} | 
+                Attack: ${player.attack} | 
+                Defense: ${player.defense} | 
+                Speed: ${player.speed}
+            `;
+        }
+
+        function showMessage(msg) {
+            messageElement.textContent = msg;
+            setTimeout(() => messageElement.textContent = '', 3000);
+        }
+
+        function movePlayer(dx, dy) {
+            let newX = player.x + dx;
+            let newY = player.y + dy;
+
+            if (level[newY][newX] === 'floor') {
+                player.x = newX;
+                player.y = newY;
+                player.element.setAttribute('x', player.x * TILE_SIZE);
+                player.element.setAttribute('y', player.y * TILE_SIZE);
+            }
+
+            // Check for item pickup
+            items = items.filter(item => {
+                if (item.x === player.x && item.y === player.y) {
+                    gameArea.removeChild(item.element);
+                    player.hp = Math.min(player.maxHp, player.hp + 20);
+                    showMessage('Health potion picked up! +20 HP');
+                    updateUI();
+                    return false;
+                }
+                return true;
+            });
+
+            // Check for enemy encounter
+            enemies.forEach(enemy => {
+                if (Math.abs(enemy.x - player.x) <= 1 && Math.abs(enemy.y - player.y) <= 1) {
+                    combat(enemy);
+                }
+            });
+
+            // Check if level is cleared
+            if (enemies.length === 0) {
+                currentLevel++;
+                showMessage(`Level ${currentLevel} completed! Starting next level...`);
+                setTimeout(initializeLevel, 2000);
+            }
+        }
+
+        function combat(enemy) {
+            let abilityChoice = prompt(`Choose an action:\n${player.abilities.map((a, i) => `${i + 1}. ${a.name} ${a.icon}`).join('\n')}\n${player.abilities.length + 1}. Regular attack`);
+            let chosenAbility = player.abilities[parseInt(abilityChoice) - 1];
+            
+            let playerDamage = player.attack - enemy.defense;
+            if (chosenAbility) {
+                playerDamage = Math.max(0, (chosenAbility.damage || playerDamage) - enemy.defense);
+                if (chosenAbility.defense) {
+                    player.defense += chosenAbility.defense;
+                    setTimeout(() => player.defense -= chosenAbility.defense, 1000);
+                }
+                if (chosenAbility.speed) {
+                    player.speed += chosenAbility.speed;
+                    setTimeout(() => player.speed -= chosenAbility.speed, 1000);
+                }
+                showMessage(`You used ${chosenAbility.name} for ${playerDamage} damage!`);
+            } else {
+                showMessage(`You attack for ${playerDamage} damage!`);
+            }
+            
+            enemy.hp -= playerDamage;
+
+            if (enemy.hp <= 0) {
+                showMessage('Enemy defeated!');
+                gameArea.removeChild(enemy.element);
+                enemies = enemies.filter(e => e !== enemy);
+                player.xp += 10;
+                if (player.xp >= player.level * 20) {
+                    levelUp();
+                }
+            } else {
+                let enemyDamage = Math.max(1, enemy.attack - player.defense);
+                player.hp -= enemyDamage;
+                showMessage(`Enemy attacks for ${enemyDamage} damage!`);
+
+                if (player.hp <= 0) {
+                    alert('Game Over! You died.');
+                    initializeGame();
+                }
+            }
+
+            updateUI();
+        }
+
+        function levelUp() {
+            player.level++;
+            player.maxHp += 20;
+            player.hp = player.maxHp;
+            player.attack += 2;
+            player.defense += 1;
+            player.xp = 0;
+
+            showMessage(`🎉 Level up! You are now level ${player.level}.`);
+
+            if (player.level % 3 === 0 && player.abilities.length < 6) {
+                let availableAbilities = classAbilities[player.class].filter(a => !player.abilities.some(pa => pa.name === a.name));
+                if (availableAbilities.length > 0) {
+                    let choice = prompt(`Choose a new ${player.class} ability:\n${availableAbilities.map((a, i) => `${i + 1}. ${a.name} ${a.icon}`).join('\n')}`);
+                    let chosenAbility = availableAbilities[parseInt(choice) - 1];
+                    if (chosenAbility) {
+                        player.abilities.push(chosenAbility);
+                        showMessage(`You learned ${chosenAbility.name} ${chosenAbility.icon}!`);
+                    }
+                }
+            }
+
+            updateUI();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp': movePlayer(0, -1); break;
+                case 'ArrowDown': movePlayer(0, 1); break;
+                case 'ArrowLeft': movePlayer(-1, 0); break;
+                case 'ArrowRight': movePlayer(1, 0); break;
+            }
+        });
+
+        initializeGame();
+    </script>
+</body>
+</html>
