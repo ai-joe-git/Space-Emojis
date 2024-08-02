@@ -332,31 +332,28 @@
             renderLevel();
         }
 
-        function levelUp() {
-            player.level++;
-            player.maxHp += 20;
-            player.hp = player.maxHp;
-            player.maxMana += 10;
-            player.mana = player.maxMana;
-            player.attack += 2;
-            player.defense += 1;
-            player.xp = 0;
+function levelUp() {
+    player.level++;
+    player.maxHp += 20;
+    player.hp = player.maxHp;
+    player.maxMana += 10;
+    player.mana = player.maxMana;
+    player.attack += 2;
+    player.defense += 1;
+    player.xp = 0;
 
-            showMessage(`🎉 Level up! You are now level ${player.level}.`);
+    showMessage(`🎉 Level up! You are now level ${player.level}.`);
 
-            if (player.level % 3 === 0 && player.abilities.length < 6) {
-                let availableAbilities = classAbilities[player.class].filter(a => !player.abilities.some(pa => pa.name === a.name));
-                if (availableAbilities.length > 0
-                    if (player.level % 3 === 0 && player.abilities.length < 6) {
-                let availableAbilities = classAbilities[player.class].filter(a => !player.abilities.some(pa => pa.name === a.name));
-                if (availableAbilities.length > 0) {
-                    let newAbility = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
-                    player.abilities.push(newAbility);
-                    showMessage(`You learned a new ability: ${newAbility.name}!`);
-                    createAbilityButtons();
-                }
-            }
+    if (player.level % 3 === 0 && player.abilities.length < 6) {
+        let availableAbilities = classAbilities[player.class].filter(a => !player.abilities.some(pa => pa.name === a.name));
+        if (availableAbilities.length > 0) {
+            let newAbility = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
+            player.abilities.push(newAbility);
+            showMessage(`You learned a new ability: ${newAbility.name}!`);
+            createAbilityButtons();
         }
+    }
+}
 
         function useItem(item) {
             if (item.effect.hp) {
