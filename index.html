@@ -3,68 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dungeon Crawler RPG</title>
+    <title>Enhanced Dungeon Crawler RPG</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: Arial, sans-serif; }
         #gameArea { white-space: pre; font-size: 20px; line-height: 20px; }
         #ui { position: absolute; top: 10px; left: 10px; }
         #message { position: absolute; bottom: 10px; left: 10px; }
+        #inventory { position: absolute; top: 10px; right: 10px; }
+        .ability-button { margin: 5px; padding: 5px 10px; }
     </style>
 </head>
 <body>
     <div id="ui"></div>
     <div id="gameArea"></div>
     <div id="message"></div>
+    <div id="inventory"></div>
+    <div id="abilities"></div>
 
     <script>
         const gameArea = document.getElementById('gameArea');
         const ui = document.getElementById('ui');
         const messageElement = document.getElementById('message');
-        const GRID_SIZE = 20;
-        const TILE_SIZE = 1; // Not used but kept for reference
+        const inventoryElement = document.getElementById('inventory');
+        const abilitiesElement = document.getElementById('abilities');
+        const GRID_SIZE = 30;
+        const TILE_SIZE = 1;
         let player, enemies, items, level, currentLevel;
 
         const classes = {
             Warrior: {
                 icon: '🛡️',
-                baseStats: { hp: 120, maxHp: 120, attack: 15, defense: 10, speed: 1 },
+                baseStats: { hp: 120, maxHp: 120, attack: 15, defense: 10, speed: 1, mana: 50, maxMana: 50 },
                 abilities: [
-                    { name: 'Slash', icon: '🗡️', damage: 20 },
-                    { name: 'Shield Bash', icon: '🛡️', damage: 15, defense: 5 },
+                    { name: 'Slash', icon: '🗡️', damage: 20, manaCost: 5 },
+                    { name: 'Shield Bash', icon: '🛡️', damage: 15, defense: 5, manaCost: 10 },
                 ]
             },
             Mage: {
                 icon: '🧙',
-                baseStats: { hp: 80, maxHp: 80, attack: 20, defense: 5, speed: 1 },
+                baseStats: { hp: 80, maxHp: 80, attack: 20, defense: 5, speed: 1, mana: 100, maxMana: 100 },
                 abilities: [
-                    { name: 'Fireball', icon: '🔥', damage: 25 },
-                    { name: 'Frost Nova', icon: '❄️', damage: 15, slow: 2 },
+                    { name: 'Fireball', icon: '🔥', damage: 25, manaCost: 15 },
+                    { name: 'Frost Nova', icon: '❄️', damage: 15, slow: 2, manaCost: 20 },
                 ]
             },
             Rogue: {
                 icon: '🥷',
-                baseStats: { hp: 100, maxHp: 100, attack: 12, defense: 7, speed: 2 },
+                baseStats: { hp: 100, maxHp: 100, attack: 12, defense: 7, speed: 2, mana: 75, maxMana: 75 },
                 abilities: [
-                    { name: 'Backstab', icon: '🗡️', damage: 30 },
-                    { name: 'Smoke Bomb', icon: '💨', defense: 10 },
+                    { name: 'Backstab', icon: '🗡️', damage: 30, manaCost: 10 },
+                    { name: 'Smoke Bomb', icon: '💨', defense: 10, manaCost: 15 },
                 ]
             }
         };
 
         const classAbilities = {
             Warrior: [
-                { name: 'Whirlwind', icon: '🌪️', damage: 30, aoe: true },
-                { name: 'Fortify', icon: '🏰', defense: 15 },
+                { name: 'Whirlwind', icon: '🌪️', damage: 30, aoe: true, manaCost: 25 },
+                { name: 'Fortify', icon: '🏰', defense: 15, manaCost: 20 },
             ],
             Mage: [
-                { name: 'Lightning Bolt', icon: '⚡', damage: 35 },
-                { name: 'Arcane Barrier', icon: '🔮', defense: 20 },
+                { name: 'Lightning Bolt', icon: '⚡', damage: 35, manaCost: 30 },
+                { name: 'Arcane Barrier', icon: '🔮', defense: 20, manaCost: 25 },
             ],
             Rogue: [
-                { name: 'Poison Dagger', icon: '🗡️', damage: 20, dot: 10 },
-                { name: 'Shadow Step', icon: '👥', speed: 3 },
+                { name: 'Poison Dagger', icon: '🗡️', damage: 20, dot: 10, manaCost: 20 },
+                { name: 'Shadow Step', icon: '👥', speed: 3, manaCost: 25 },
             ]
         };
+
+        const itemTypes = [
+            { name: 'Health Potion', icon: '🧪', effect: { hp: 30 } },
+            { name: 'Mana Potion', icon: '🧪', effect: { mana: 30 } },
+            { name: 'Strength Potion', icon: '🧪', effect: { attack: 5 }, duration: 5 },
+            { name: 'Defense Potion', icon: '🧪', effect: { defense: 5 }, duration: 5 },
+            { name: 'Speed Potion', icon: '🧪', effect: { speed: 1 }, duration: 5 },
+        ];
 
         function initializeGame() {
             currentLevel = 1;
@@ -85,37 +99,36 @@
                 xp: 0,
                 class: selectedClass,
                 appearance: classes[selectedClass].icon,
-                abilities: [...classes[selectedClass].abilities]
+                abilities: [...classes[selectedClass].abilities],
+                inventory: [],
+                gold: 0,
+                buffs: []
             };
             
+            createAbilityButtons();
             initializeLevel();
         }
 
         function initializeLevel() {
-            // Clear previous game state
             gameArea.textContent = '';
 
-            // Generate level
             level = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill('🟫'));
             for (let i = 0; i < GRID_SIZE; i++) {
                 level[0][i] = level[GRID_SIZE-1][i] = level[i][0] = level[i][GRID_SIZE-1] = '🧱';
             }
 
-            // Place walls
-            for (let i = 0; i < 50; i++) {
+            for (let i = 0; i < 100; i++) {
                 let x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                 let y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                 level[y][x] = '🧱';
             }
 
-            // Place player
             player.x = 1;
             player.y = 1;
             level[player.y][player.x] = player.appearance;
 
-            // Place enemies
             enemies = [];
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 8 + currentLevel; i++) {
                 let x, y;
                 do {
                     x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
@@ -130,16 +143,27 @@
                 });
             }
 
-            // Place items
             items = [];
+            for (let i = 0; i < 5; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                    y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+                } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
+                let item = {...itemTypes[Math.floor(Math.random() * itemTypes.length)]};
+                level[y][x] = item.icon;
+                items.push({ ...item, x, y });
+            }
+
+            // Add gold
             for (let i = 0; i < 3; i++) {
                 let x, y;
                 do {
                     x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                     y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
                 } while (level[y][x] !== '🟫' || (x === player.x && y === player.y));
-                level[y][x] = '🧪';
-                items.push({ x, y });
+                level[y][x] = '💰';
+                items.push({ name: 'Gold', icon: '💰', x, y, amount: Math.floor(Math.random() * 20) + 10 });
             }
 
             renderLevel();
@@ -155,11 +179,21 @@
                 Level: ${currentLevel} | 
                 Class: ${player.class} ${classes[player.class].icon} | 
                 HP: ${player.hp}/${player.maxHp} | 
+                Mana: ${player.mana}/${player.maxMana} | 
                 XP: ${player.xp}/${player.level * 20} | 
                 Attack: ${player.attack} | 
                 Defense: ${player.defense} | 
-                Speed: ${player.speed}
+                Speed: ${player.speed} | 
+                Gold: ${player.gold}
             `;
+
+            inventoryElement.innerHTML = 'Inventory: ' + player.inventory.map(item => item.icon).join(' ');
+
+            // Display active buffs
+            let buffDisplay = player.buffs.map(buff => `${buff.name}: ${buff.duration} turns`).join(', ');
+            if (buffDisplay) {
+                ui.innerHTML += '<br>Active Buffs: ' + buffDisplay;
+            }
         }
 
         function showMessage(msg) {
@@ -171,31 +205,51 @@
             let newX = player.x + dx;
             let newY = player.y + dy;
 
-            if (level[newY][newX] === '🟫') {
+            if (level[newY][newX] === '🟫' || level[newY][newX] === '💰' || level[newY][newX] === '🧪') {
                 level[player.y][player.x] = '🟫';
                 player.x = newX;
                 player.y = newY;
+
+                // Item pickup
+                let item = items.find(item => item.x === player.x && item.y === player.y);
+                if (item) {
+                    if (item.name === 'Gold') {
+                        player.gold += item.amount;
+                        showMessage(`Picked up ${item.amount} gold!`);
+                    } else {
+                        player.inventory.push(item);
+                        showMessage(`Picked up ${item.name}!`);
+                    }
+                    items = items.filter(i => i !== item);
+                }
+
                 level[player.y][player.x] = player.appearance;
             }
 
-            // Check for item pickup
-            items = items.filter(item => {
-                if (item.x === player.x && item.y === player.y) {
-                    level[player.y][player.x] = player.appearance;
-                    player.hp = Math.min(player.maxHp, player.hp + 20);
-                    showMessage('Health potion picked up! +20 HP');
-                    updateUI();
+            // Enemy movement and combat
+            enemies.forEach(enemy => {
+                if (Math.abs(enemy.x - player.x) <= 1 && Math.abs(enemy.y - player.y) <= 1) {
+                    combat(enemy);
+                } else {
+                    moveEnemy(enemy);
+                }
+            });
+
+            // Update buffs
+            player.buffs = player.buffs.filter(buff => {
+                buff.duration--;
+                if (buff.duration <= 0) {
+                    // Remove buff effect
+                    Object.keys(buff.effect).forEach(stat => {
+                        player[stat] -= buff.effect[stat];
+                    });
                     return false;
                 }
                 return true;
             });
 
-            // Check for enemy encounter
-            enemies.forEach(enemy => {
-                if (Math.abs(enemy.x - player.x) <= 1 && Math.abs(enemy.y - player.y) <= 1) {
-                    combat(enemy);
-                }
-            });
+            // Regenerate mana
+            player.mana = Math.min(player.maxMana, player.mana + 1);
 
             // Check if level is cleared
             if (enemies.length === 0) {
@@ -205,29 +259,27 @@
             }
 
             renderLevel();
+            updateUI();
+        }
+
+        function moveEnemy(enemy) {
+            let dx = Math.sign(player.x - enemy.x);
+            let dy = Math.sign(player.y - enemy.y);
+            let newX = enemy.x + dx;
+            let newY = enemy.y + dy;
+
+            if (level[newY][newX] === '🟫') {
+                level[enemy.y][enemy.x] = '🟫';
+                enemy.x = newX;
+                enemy.y = newY;
+                level[enemy.y][enemy.x] = '👾';
+            }
         }
 
         function combat(enemy) {
-            let abilityChoice = prompt(`Choose an action:\n${player.abilities.map((a, i) => `${i + 1}. ${a.name} ${a.icon}`).join('\n')}\n${player.abilities.length + 1}. Regular attack`);
-            let chosenAbility = player.abilities[parseInt(abilityChoice) - 1];
-            
-            let playerDamage = player.attack - enemy.defense;
-            if (chosenAbility) {
-                playerDamage = Math.max(0, (chosenAbility.damage || playerDamage) - enemy.defense);
-                if (chosenAbility.defense) {
-                    player.defense += chosenAbility.defense;
-                    setTimeout(() => player.defense -= chosenAbility.defense, 1000);
-                }
-                if (chosenAbility.speed) {
-                    player.speed += chosenAbility.speed;
-                    setTimeout(() => player.speed -= chosenAbility.speed, 1000);
-                }
-                showMessage(`You used ${chosenAbility.name} for ${playerDamage} damage!`);
-            } else {
-                showMessage(`You attack for ${playerDamage} damage!`);
-            }
-            
+            let playerDamage = Math.max(0, player.attack - enemy.defense);
             enemy.hp -= playerDamage;
+            showMessage(`You attack for ${playerDamage} damage!`);
 
             if (enemy.hp <= 0) {
                 showMessage('Enemy defeated!');
@@ -256,6 +308,8 @@
             player.level++;
             player.maxHp += 20;
             player.hp = player.maxHp;
+            player.maxMana += 10;
+            player.mana = player.maxMana;
             player.attack += 2;
             player.defense += 1;
             player.xp = 0;
@@ -270,6 +324,7 @@
                     if (chosenAbility) {
                         player.abilities.push(chosenAbility);
                         showMessage(`You learned ${chosenAbility.name} ${chosenAbility.icon}!`);
+                        createAbilityButtons();
                     }
                 }
             }
@@ -277,12 +332,113 @@
             updateUI();
         }
 
-        document.addEventListener('keydown', (e) => {
-            switch(e.key) {
+        function useItem(item) {
+            if (item.effect.hp) {
+                player.hp = Math.min(player.maxHp, player.hp + item.effect.hp);
+                showMessage(`Used ${item.name}. Healed ${item.effect.hp} HP.`);
+            }
+            if (item.effect.mana) {
+                player.mana = Math.min
+(player.maxMana, player.mana + item.effect.mana);
+                showMessage(`Used ${item.name}. Restored ${item.effect.mana} Mana.`);
+            }
+            if (item.duration) {
+                player.buffs.push({
+                    name: item.name,
+                    effect: item.effect,
+                    duration: item.duration
+                });
+                Object.keys(item.effect).forEach(stat => {
+                    if (stat !== 'hp' && stat !== 'mana') {
+                        player[stat] += item.effect[stat];
+                    }
+                });
+                showMessage(`Used ${item.name}. Buff active for ${item.duration} turns.`);
+            }
+            player.inventory = player.inventory.filter(i => i !== item);
+            updateUI();
+        }
+
+        function createAbilityButtons() {
+            abilitiesElement.innerHTML = '';
+            player.abilities.forEach(ability => {
+                let button = document.createElement('button');
+                button.textContent = `${ability.name} ${ability.icon}`;
+                button.className = 'ability-button';
+                button.onclick = () => useAbility(ability);
+                abilitiesElement.appendChild(button);
+            });
+        }
+
+        function useAbility(ability) {
+            if (player.mana < ability.manaCost) {
+                showMessage('Not enough mana!');
+                return;
+            }
+
+            player.mana -= ability.manaCost;
+
+            if (ability.damage) {
+                let targets = ability.aoe ? enemies.filter(e => Math.abs(e.x - player.x) <= 1 && Math.abs(e.y - player.y) <= 1) : [enemies.find(e => Math.abs(e.x - player.x) <= 1 && Math.abs(e.y - player.y) <= 1)];
+                targets.forEach(enemy => {
+                    if (enemy) {
+                        let damage = Math.max(0, ability.damage - enemy.defense);
+                        enemy.hp -= damage;
+                        showMessage(`${ability.name} deals ${damage} damage to enemy!`);
+                        if (enemy.hp <= 0) {
+                            showMessage('Enemy defeated!');
+                            level[enemy.y][enemy.x] = '🟫';
+                            enemies = enemies.filter(e => e !== enemy);
+                            player.xp += 10;
+                            if (player.xp >= player.level * 20) {
+                                levelUp();
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (ability.defense) {
+                player.buffs.push({
+                    name: ability.name,
+                    effect: { defense: ability.defense },
+                    duration: 3
+                });
+                player.defense += ability.defense;
+                showMessage(`${ability.name} increases defense by ${ability.defense} for 3 turns!`);
+            }
+
+            if (ability.speed) {
+                player.buffs.push({
+                    name: ability.name,
+                    effect: { speed: ability.speed },
+                    duration: 3
+                });
+                player.speed += ability.speed;
+                showMessage(`${ability.name} increases speed by ${ability.speed} for 3 turns!`);
+            }
+
+            updateUI();
+            renderLevel();
+        }
+
+        document.addEventListener('keydown', (event) => {
+            switch(event.key) {
                 case 'ArrowUp': movePlayer(0, -1); break;
                 case 'ArrowDown': movePlayer(0, 1); break;
                 case 'ArrowLeft': movePlayer(-1, 0); break;
                 case 'ArrowRight': movePlayer(1, 0); break;
+                case ' ': 
+                    if (player.inventory.length > 0) {
+                        let itemChoice = prompt(`Choose an item to use:\n${player.inventory.map((item, index) => `${index + 1}. ${item.name} ${item.icon}`).join('\n')}`);
+                        let chosenItem = player.inventory[parseInt(itemChoice) - 1];
+                        if (chosenItem) {
+                            useItem(chosenItem);
+                        }
+                    } else {
+                        showMessage('Inventory is empty!');
+                    }
+                    break;
             }
         });
 
