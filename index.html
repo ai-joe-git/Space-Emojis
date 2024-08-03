@@ -14,19 +14,52 @@
             height: 100vh;
             background-color: #f0f0f0;
             touch-action: none;
+            font-family: Arial, sans-serif;
         }
         canvas {
             border: 1px solid #000;
             max-width: 100%;
             max-height: 100%;
         }
+        #startMenu, #gameOverMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="startMenu">
+        <h1>Jetpack Emoji Adventure</h1>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="gameOverMenu" style="display: none;">
+        <h1>Game Over</h1>
+        <p>Your Score: <span id="finalScore"></span></p>
+        <button id="restartButton">Play Again</button>
+        <button id="shareButton">Share Score</button>
+    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const startMenu = document.getElementById('startMenu');
+        const gameOverMenu = document.getElementById('gameOverMenu');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const shareButton = document.getElementById('shareButton');
+        const finalScoreElement = document.getElementById('finalScore');
 
         // Set canvas size based on window size
         function resizeCanvas() {
@@ -37,19 +70,26 @@
         window.addEventListener('resize', resizeCanvas);
 
         // Game variables
-        let player = {
-            x: 50,
-            y: canvas.height / 2,
-            size: 40,
-            speed: 5,
-            fuel: 100,
-            powerUp: null
-        };
+        let player, enemies, powerUps, projectiles, backgroundOffset, score, level, gameActive;
 
-        let enemies = [];
-        let powerUps = [];
-        let projectiles = [];
-        let backgroundOffset = 0;
+        function initGame() {
+            player = {
+                x: 50,
+                y: canvas.height / 2,
+                size: 40,
+                speed: 5,
+                fuel: 100,
+                powerUp: null,
+                powerUpTime: 0
+            };
+            enemies = [];
+            powerUps = [];
+            projectiles = [];
+            backgroundOffset = 0;
+            score = 0;
+            level = 1;
+            gameActive = true;
+        }
 
         const enemyTypes = ['👾', '👹', '👻', '🤖', '🦹'];
         const powerUpTypes = {
@@ -57,9 +97,19 @@
             'fireball': '🔥',
             'snowball': '❄️'
         };
+        const decorations = ['🌟', '🌙', '🌠', '🪐', '🌈'];
+
+        const levelColors = [
+            ['#87CEEB', '#E0F6FF'],  // Level 1: Light blue
+            ['#FFA500', '#FFD700'],  // Level 2: Orange
+            ['#9932CC', '#DA70D6'],  // Level 3: Purple
+            ['#228B22', '#32CD32'],  // Level 4: Green
+            ['#8B4513', '#D2691E']   // Level 5: Brown
+        ];
 
         // Game loop
         function gameLoop() {
+            if (!gameActive) return;
             update();
             draw();
             requestAnimationFrame(gameLoop);
@@ -80,13 +130,16 @@
             }
 
             // Update enemies
-            if (Math.random() < 0.02) {
+            if (Math.random() < 0.02 + (level * 0.005)) {
                 spawnEnemy();
             }
             enemies.forEach((enemy, index) => {
                 enemy.x -= enemy.speed;
                 if (enemy.x + enemy.size < 0) {
                     enemies.splice(index, 1);
+                }
+                if (collision(player, enemy)) {
+                    gameOver();
                 }
             });
 
@@ -101,14 +154,21 @@
                 }
                 if (collision(player, powerUp)) {
                     player.powerUp = powerUp.type;
+                    player.powerUpTime = 300;
                     powerUps.splice(index, 1);
                 }
             });
 
             // Update projectiles
-            if (player.powerUp && Math.random() < 0.1) {
-                fireProjectile();
+            if (player.powerUp && player.powerUpTime > 0) {
+                if (Math.random() < 0.1) {
+                    fireProjectile();
+                }
+                player.powerUpTime--;
+            } else {
+                player.powerUp = null;
             }
+
             projectiles.forEach((projectile, index) => {
                 projectile.x += projectile.speed;
                 if (projectile.x > canvas.width) {
@@ -118,6 +178,10 @@
                     if (collision(projectile, enemy)) {
                         enemies.splice(enemyIndex, 1);
                         projectiles.splice(index, 1);
+                        score += 10;
+                        if (score % 100 === 0) {
+                            levelUp();
+                        }
                     }
                 });
             });
@@ -132,15 +196,22 @@
         function draw() {
             // Draw animated background
             let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, "#87CEEB");
-            gradient.addColorStop(1, "#E0F6FF");
+            gradient.addColorStop(0, levelColors[level - 1][0]);
+            gradient.addColorStop(1, levelColors[level - 1][1]);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw cloud emojis
+            // Draw decorations
             ctx.font = "30px Arial";
-            for (let i = 0; i < 5; i++) {
-                ctx.fillText("☁️", (i * 200 + backgroundOffset) % canvas.width, 100);
+            for (let i = 0; i < 10; i++) {
+                ctx.fillText(decorations[Math.floor(Math.random() * decorations.length)], 
+                    Math.random() * canvas.width, 
+                    Math.random() * canvas.height);
+            }
+
+            // Draw cloud emojis
+            for (let i = 0; i < 8; i++) {
+                ctx.fillText("☁️", (i * 150 + backgroundOffset) % canvas.width, 50 + Math.sin(i) * 30);
             }
 
             // Draw player
@@ -177,12 +248,20 @@
             ctx.strokeStyle = "#000000";
             ctx.strokeRect(10, 10, 200, 20);
 
-            // Draw power-up indicator
+            // Draw power-up indicator and time
             if (player.powerUp) {
                 ctx.fillStyle = "#000000";
                 ctx.font = "20px Arial";
                 ctx.fillText(`Power-up: ${powerUpTypes[player.powerUp]}`, 10, 60);
+                ctx.fillRect(10, 70, player.powerUpTime * 2/3, 10);
+                ctx.strokeRect(10, 70, 200, 10);
             }
+
+            // Draw score and level
+            ctx.fillStyle = "#000000";
+            ctx.font = "24px Arial";
+            ctx.fillText(`Score: ${score}`, canvas.width - 150, 30);
+            ctx.fillText(`Level: ${level}`, canvas.width - 150, 60);
         }
 
         function spawnEnemy() {
@@ -190,7 +269,7 @@
                 x: canvas.width,
                 y: Math.random() * (canvas.height - 50),
                 size: 40,
-                speed: 2 + Math.random() * 3,
+                speed: 2 + Math.random() * 3 + (level * 0.5),
                 emoji: enemyTypes[Math.floor(Math.random() * enemyTypes.length)]
             });
         }
@@ -222,6 +301,17 @@
                    obj1.y + obj1.size > obj2.y;
         }
 
+        function levelUp() {
+            level = Math.min(level + 1, 5);
+            player.speed += 0.5;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            finalScoreElement.textContent = score;
+            gameOverMenu.style.display = 'block';
+        }
+
         // Touch input
         let isJetpackActive = false;
 
@@ -239,8 +329,25 @@
             e.preventDefault();
         });
 
-        // Start the game
-        gameLoop();
+        // Start menu
+        startButton.addEventListener('click', () => {
+            startMenu.style.display = 'none';
+            initGame();
+            gameLoop();
+        });
+
+        // Game over menu
+        restartButton.addEventListener('click', () => {
+            gameOverMenu.style.display = 'none';
+            initGame();
+            gameLoop();
+        });
+
+        shareButton.addEventListener('click', () => {
+            const text = `I scored ${score} points in Jetpack Emoji Adventure! Can you beat my score?`;
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${url}`);
+        });
     </script>
 </body>
 </html>
