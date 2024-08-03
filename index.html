@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Jetpack Emoji Adventure</title>
     <style>
         body {
@@ -12,441 +12,235 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #87CEEB;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
+            background-color: #f0f0f0;
+            touch-action: none;
         }
-        #gameCanvas {
-            border: 2px solid #000;
-        }
-        #gameOver, #startScreen {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            font-size: 24px;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 20px;
-            border-radius: 10px;
-        }
-        button {
-            font-size: 18px;
-            padding: 10px 20px;
-            margin-top: 20px;
-            cursor: pointer;
-        }
-        .emoji {
-            font-size: 40px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        #socialShare {
-            margin-top: 20px;
-        }
-        .shareButton {
-            margin: 0 10px;
-            font-size: 24px;
-            cursor: pointer;
+        canvas {
+            border: 1px solid #000;
+            max-width: 100%;
+            max-height: 100%;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div id="startScreen">
-        <h1>Jetpack Emoji Adventure</h1>
-        <p>Tap or click to use jetpack and avoid enemies!</p>
-        <button id="startButton">Start Game</button>
-    </div>
-    <div id="gameOver">
-        <h2>Game Over!</h2>
-        <p>Score: <span id="finalScore"></span></p>
-        <p>High Score: <span id="highScore"></span></p>
-        <button id="restartButton">Restart</button>
-        <div id="socialShare">
-            <span class="shareButton" onclick="shareScore('twitter')">🐦</span>
-            <span class="shareButton" onclick="shareScore('facebook')">📘</span>
-        </div>
-    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const gameOverScreen = document.getElementById('gameOver');
-        const startScreen = document.getElementById('startScreen');
-        const finalScoreSpan = document.getElementById('finalScore');
-        const highScoreSpan = document.getElementById('highScore');
-        const restartButton = document.getElementById('restartButton');
-        const startButton = document.getElementById('startButton');
 
-        canvas.width = window.innerWidth - 20;
-        canvas.height = window.innerHeight - 20;
-
-        let player, enemies, boss, powerUps, projectiles;
-        let score = 0;
-        let highScore = 0;
-        let level = 1;
-        let fuel = 100;
-        let isBossLevel = false;
-        let isGameRunning = false;
-        let isJetpackActive = false;
-
-        // Fallback storage when localStorage is not available
-        let fallbackStorage = {};
-
-        function safeGetItem(key, fallback) {
-            try {
-                const value = localStorage.getItem(key);
-                return value !== null ? value : fallback;
-            } catch (e) {
-                console.warn("localStorage is not available. Using fallback storage.");
-                return fallbackStorage[key] || fallback;
-            }
+        // Set canvas size based on window size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.95;
+            canvas.height = window.innerHeight * 0.95;
         }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
-        function safeSetItem(key, value) {
-            try {
-                localStorage.setItem(key, value);
-            } catch (e) {
-                console.warn("localStorage is not available. Using fallback storage.");
-                fallbackStorage[key] = value;
-            }
-        }
+        // Game variables
+        let player = {
+            x: 50,
+            y: canvas.height / 2,
+            size: 40,
+            speed: 5,
+            fuel: 100,
+            powerUp: null
+        };
 
-        highScore = parseInt(safeGetItem('highScore', '0'), 10);
+        let enemies = [];
+        let powerUps = [];
+        let projectiles = [];
+        let backgroundOffset = 0;
 
-        class GameObject {
-            constructor(x, y, emoji, size) {
-                this.x = x;
-                this.y = y;
-                this.emoji = emoji;
-                this.size = size;
-            }
+        const enemyTypes = ['👾', '👹', '👻', '🤖', '🦹'];
+        const powerUpTypes = {
+            'laser': '🔫',
+            'fireball': '🔥',
+            'snowball': '❄️'
+        };
 
-            draw() {
-                ctx.font = `${this.size}px Arial`;
-                ctx.fillText(this.emoji, this.x, this.y);
-            }
-
-            collision(other) {
-                return Math.abs(this.x - other.x) < this.size / 2 + other.size / 2 &&
-                       Math.abs(this.y - other.y) < this.size / 2 + other.size / 2;
-            }
-        }
-
-        class Player extends GameObject {
-            constructor() {
-                super(50, canvas.height / 2, '🚀', 40);
-                this.vy = 0;
-                this.powerUp = null;
-                this.powerUpTimer = 0;
-            }
-
-            update() {
-                if (isJetpackActive && fuel > 0) {
-                    this.vy -= 0.5;
-                    fuel -= 0.5;
-                } else {
-                    this.vy += 0.3;
-                }
-
-                this.vy = Math.max(-5, Math.min(5, this.vy));
-                this.y += this.vy;
-                
-                if (this.y < 0) this.y = 0;
-                if (this.y > canvas.height) this.y = canvas.height;
-
-                if (this.powerUp && this.powerUpTimer > 0) {
-                    this.powerUpTimer--;
-                } else if (this.powerUpTimer <= 0) {
-                    this.powerUp = null;
-                }
-            }
-
-            shoot() {
-                if (this.powerUp) {
-                    return new Projectile(this.x + this.size, this.y, this.powerUp, 20);
-                }
-                return null;
-            }
-
-            collectPowerUp(powerUp) {
-                try {
-                    this.powerUp = powerUp.emoji;
-                    this.powerUpTimer = 300;
-                    console.log("Power-up collected:", this.powerUp);
-                } catch (error) {
-                    console.error("Error collecting power-up:", error);
-                }
-            }
-        }
-
-        class Enemy extends GameObject {
-            constructor() {
-                const types = ['👾', '👻', '🦹'];
-                super(canvas.width, Math.random() * canvas.height, types[Math.floor(Math.random() * types.length)], 30);
-                this.vx = -2 - Math.random() * 2;
-                this.vy = Math.random() * 2 - 1;
-            }
-
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
-            }
-        }
-
-        class Boss extends GameObject {
-            constructor() {
-                const types = ['👹', '🐉', '🦑'];
-                super(canvas.width - 100, canvas.height / 2, types[Math.floor(Math.random() * types.length)], 60);
-                this.health = 100;
-                this.attackTimer = 0;
-                this.attackPattern = Math.floor(Math.random() * 3);
-            }
-
-            update() {
-                this.attackTimer++;
-                if (this.attackTimer >= 60) {
-                    this.attackTimer = 0;
-                    return this.attack();
-                }
-                return null;
-            }
-
-            attack() {
-                switch(this.attackPattern) {
-                    case 0: // Single shot
-                        return new Projectile(this.x - this.size, this.y, '🔥', 20);
-                    case 1: // Triple shot
-                        return [
-                            new Projectile(this.x - this.size, this.y - 30, '🔥', 20),
-                            new Projectile(this.x - this.size, this.y, '🔥', 20),
-                            new Projectile(this.x - this.size, this.y + 30, '🔥', 20)
-                        ];
-                    case 2: // Homing missile
-                        return new Projectile(this.x - this.size, this.y, '🚀', 20);
-                }
-            }
-        }
-
-        class PowerUp extends GameObject {
-            constructor() {
-                const powerUps = ['🔫', '❄️', '🔥', '🛡️', '⚡'];
-                super(canvas.width, Math.random() * canvas.height, powerUps[Math.floor(Math.random() * powerUps.length)], 30);
-                this.vx = -1;
-            }
-
-            update() {
-                this.x += this.vx;
-            }
-        }
-
-        class Projectile extends GameObject {
-            constructor(x, y, emoji, size) {
-                super(x, y, emoji, size);
-                this.vx = 5; // Projectile speed
-            }
-
-            update() {
-                this.x += this.vx;
-            }
-        }
-
-        function init() {
-            player = new Player();
-            enemies = [];
-            powerUps = [];
-            projectiles = [];
-            boss = null;
-            score = 0;
-            level = 1;
-            fuel = 100;
-            isBossLevel = false;
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
         }
 
         function update() {
-            player.update();
-
-            if (!isBossLevel) {
-                if (Math.random() < 0.02) {
-                    enemies.push(new Enemy());
-                }
-
-                if (Math.random() < 0.005) {
-                    powerUps.push(new PowerUp());
-                }
-
-                enemies = enemies.filter(enemy => {
-                    if (enemy instanceof Enemy) {
-                        enemy.update();
-                        if (player.collision(enemy)) {
-                            gameOver();
-                            return false;
-                        }
-                        return enemy.x > -enemy.size;
-                    } else {
-                        console.warn("Non-Enemy object found in enemies array:", enemy);
-                        return false; // Remove non-Enemy objects
-                    }
-                });
-
-                powerUps = powerUps.filter(powerUp => {
-                    powerUp.update();
-                    if (player.collision(powerUp)) {
-                        player.collectPowerUp(powerUp);
-                        return false;
-                    }
-                    return powerUp.x > -powerUp.size;
-                });
-
-                score++;
-
-                if (score % 1000 === 0) {
-                    level++;
-                    if (level % 10 === 0) {
-                        isBossLevel = true;
-                        boss = new Boss();
-                    }
-                }
-            } else {
-                const bossAttack = boss.update();
-                if (bossAttack) {
-                    if (Array.isArray(bossAttack)) {
-                        projectiles.push(...bossAttack);
-                    } else {
-                        projectiles.push(bossAttack);
-                    }
-                }
-
-                if (player.collision(boss)) {
-                    gameOver();
-                }
-
-                if (boss.health <= 0) {
-                    isBossLevel = false;
-                    boss = null;
-                    score += 1000;
-                }
+            // Player movement
+            if (isJetpackActive && player.fuel > 0) {
+                player.y -= player.speed;
+                player.fuel -= 0.5;
+            } else if (player.y < canvas.height - player.size) {
+                player.y += player.speed / 2;
             }
 
-            updateProjectiles();
-
-            if (fuel < 100) {
-                fuel += 0.1;
+            // Refuel when not using jetpack
+            if (!isJetpackActive && player.fuel < 100) {
+                player.fuel += 0.2;
             }
-        }
 
-        function updateProjectiles() {
-            projectiles = projectiles.filter(projectile => {
-                projectile.update();
-                // Check for collisions with enemies or boss
-                if (isBossLevel && boss && projectile.collision(boss)) {
-                    boss.health -= 10;
-                    return false;
+            // Update enemies
+            if (Math.random() < 0.02) {
+                spawnEnemy();
+            }
+            enemies.forEach((enemy, index) => {
+                enemy.x -= enemy.speed;
+                if (enemy.x + enemy.size < 0) {
+                    enemies.splice(index, 1);
                 }
-                // Remove projectile if it's off-screen
-                return projectile.x < canvas.width && projectile.x > 0;
             });
+
+            // Update power-ups
+            if (Math.random() < 0.005) {
+                spawnPowerUp();
+            }
+            powerUps.forEach((powerUp, index) => {
+                powerUp.x -= 2;
+                if (powerUp.x + powerUp.size < 0) {
+                    powerUps.splice(index, 1);
+                }
+                if (collision(player, powerUp)) {
+                    player.powerUp = powerUp.type;
+                    powerUps.splice(index, 1);
+                }
+            });
+
+            // Update projectiles
+            if (player.powerUp && Math.random() < 0.1) {
+                fireProjectile();
+            }
+            projectiles.forEach((projectile, index) => {
+                projectile.x += projectile.speed;
+                if (projectile.x > canvas.width) {
+                    projectiles.splice(index, 1);
+                }
+                enemies.forEach((enemy, enemyIndex) => {
+                    if (collision(projectile, enemy)) {
+                        enemies.splice(enemyIndex, 1);
+                        projectiles.splice(index, 1);
+                    }
+                });
+            });
+
+            // Animate background
+            backgroundOffset += 0.5;
+            if (backgroundOffset >= canvas.width) {
+                backgroundOffset = 0;
+            }
         }
 
         function draw() {
-            // Create gradient background
+            // Draw animated background
             let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, "#87CEEB");  // Sky Blue
-            gradient.addColorStop(1, "#E0F6FF");  // Light Blue
+            gradient.addColorStop(0, "#87CEEB");
+            gradient.addColorStop(1, "#E0F6FF");
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            player.draw();
-            enemies.forEach(enemy => enemy.draw());
-            powerUps.forEach(powerUp => powerUp.draw());
-            projectiles.forEach(projectile => projectile.draw());
-
-            if (isBossLevel && boss) {
-                boss.draw();
+            // Draw cloud emojis
+            ctx.font = "30px Arial";
+            for (let i = 0; i < 5; i++) {
+                ctx.fillText("☁️", (i * 200 + backgroundOffset) % canvas.width, 100);
             }
 
-            ctx.fillStyle = 'black';
-            ctx.font = '20px Arial';
-            ctx.fillText(`Score: ${score}`, 10, 30);
-            ctx.fillText(`Level: ${level}`, 10, 60);
-            ctx.fillText(`Fuel: ${Math.round(fuel)}`, 10, 90);
+            // Draw player
+            ctx.font = `${player.size}px Arial`;
+            ctx.fillText("🚀", player.x, player.y);
 
+            // Draw jetpack flame
+            if (isJetpackActive && player.fuel > 0) {
+                ctx.font = `${player.size / 2}px Arial`;
+                ctx.fillText("🔥", player.x - 10, player.y + player.size / 2);
+            }
+
+            // Draw enemies
+            enemies.forEach(enemy => {
+                ctx.font = `${enemy.size}px Arial`;
+                ctx.fillText(enemy.emoji, enemy.x, enemy.y);
+            });
+
+            // Draw power-ups
+            powerUps.forEach(powerUp => {
+                ctx.font = `${powerUp.size}px Arial`;
+                ctx.fillText(powerUpTypes[powerUp.type], powerUp.x, powerUp.y);
+            });
+
+            // Draw projectiles
+            projectiles.forEach(projectile => {
+                ctx.font = `${projectile.size}px Arial`;
+                ctx.fillText(powerUpTypes[projectile.type], projectile.x, projectile.y);
+            });
+
+            // Draw fuel bar
+            ctx.fillStyle = "#00FF00";
+            ctx.fillRect(10, 10, player.fuel * 2, 20);
+            ctx.strokeStyle = "#000000";
+            ctx.strokeRect(10, 10, 200, 20);
+
+            // Draw power-up indicator
             if (player.powerUp) {
-                ctx.fillText(`Power-up: ${player.powerUp}`, 10, 120);
+                ctx.fillStyle = "#000000";
+                ctx.font = "20px Arial";
+                ctx.fillText(`Power-up: ${powerUpTypes[player.powerUp]}`, 10, 60);
             }
         }
 
-        function gameLoop() {
-            if (isGameRunning) {
-                update();
-                draw();
-                requestAnimationFrame(gameLoop);
-            }
+        function spawnEnemy() {
+            enemies.push({
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 50),
+                size: 40,
+                speed: 2 + Math.random() * 3,
+                emoji: enemyTypes[Math.floor(Math.random() * enemyTypes.length)]
+            });
         }
 
-        function gameOver() {
-            isGameRunning = false;
-            gameOverScreen.style.display = 'block';
-            finalScoreSpan.textContent = score;
-            if (score > highScore) {
-                highScore = score;
-                safeSetItem('highScore', highScore.toString());
-            }
-            highScoreSpan.textContent = highScore;
+        function spawnPowerUp() {
+            const types = Object.keys(powerUpTypes);
+            powerUps.push({
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 40),
+                size: 40,
+                type: types[Math.floor(Math.random() * types.length)]
+            });
         }
 
-        function handleInput(e) {
+        function fireProjectile() {
+            projectiles.push({
+                x: player.x + player.size,
+                y: player.y + player.size / 2,
+                size: 20,
+                speed: 10,
+                type: player.powerUp
+            });
+        }
+
+        function collision(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.size &&
+                   obj1.x + obj1.size > obj2.x &&
+                   obj1.y < obj2.y + obj2.size &&
+                   obj1.y + obj1.size > obj2.y;
+        }
+
+        // Touch input
+        let isJetpackActive = false;
+
+        canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             isJetpackActive = true;
-        }
+        });
 
-        function handleInputEnd(e) {
+        canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
             isJetpackActive = false;
-            if (player.powerUp) {
-                const projectile = player.shoot();
-                if (projectile) {
-                    projectiles.push(projectile);
-                }
-            }
-        }
-
-        function shareScore(platform) {
-            const text = `I scored ${score} points in Jetpack Emoji Adventure! Can you beat my score?`;
-            const url = encodeURIComponent(window.location.href);
-            let shareUrl;
-
-            if (platform === 'twitter') {
-                shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${url}`;
-            } else if (platform === 'facebook') {
-                shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${encodeURIComponent(text)}`;
-            }
-
-            window.open(shareUrl, '_blank');
-        }
-
-        canvas.addEventListener('mousedown', handleInput);
-        canvas.addEventListener('mouseup', handleInputEnd);
-        canvas.addEventListener('touchstart', handleInput);
-        canvas.addEventListener('touchend', handleInputEnd);
-
-        restartButton.addEventListener('click', () => {
-            gameOverScreen.style.display = 'none';
-            init();
-            isGameRunning = true;
-            requestAnimationFrame(gameLoop);
         });
 
-        startButton.addEventListener('click', () => {
-            startScreen.style.display = 'none';
-            init();
-            isGameRunning = true;
-            requestAnimationFrame(gameLoop);
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
         });
 
-        // Show start screen
-        startScreen.style.display = 'block';
+        // Start the game
+        gameLoop();
     </script>
 </body>
 </html>
