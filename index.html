@@ -13,9 +13,12 @@
             height: 100vh;
             background-color: #000;
             font-family: Arial, sans-serif;
+            touch-action: none;
         }
         canvas {
             border: 1px solid white;
+            max-width: 100%;
+            max-height: 100%;
         }
         #gameOver {
             position: absolute;
@@ -30,15 +33,28 @@
             margin-top: 20px;
             cursor: pointer;
         }
+        #shootButton {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 24px;
+            padding: 15px 30px;
+            background-color: rgba(255, 255, 255, 0.3);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <canvas id="gameCanvas"></canvas>
     <div id="gameOver">
         Game Over<br>
         <span id="finalScore"></span><br>
         <button id="restartButton">Restart</button>
     </div>
+    <button id="shootButton">Shoot</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -46,6 +62,15 @@
         const gameOverScreen = document.getElementById('gameOver');
         const finalScoreDisplay = document.getElementById('finalScore');
         const restartButton = document.getElementById('restartButton');
+        const shootButton = document.getElementById('shootButton');
+
+        // Set canvas size based on window size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.95;
+            canvas.height = window.innerHeight * 0.95;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
         let player = {
             x: 50,
@@ -389,10 +414,10 @@
         function draw() {
             // Create gradient background based on level
             let gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            let hue1 = (level * 20) % 360;
-            let hue2 = (hue1 + 60) % 360;
-            gradient.addColorStop(0, `hsl(${hue1}, 50%, 20%)`);
-            gradient.addColorStop(1, `hsl(${hue2}, 50%, 20%)`);
+            let hue1 = 220 + (level * 5) % 40; // Base blue hue
+            let hue2 = (hue1 + 30) % 360;
+            gradient.addColorStop(0, `hsl(${hue1}, 70%, 15%)`);
+            gradient.addColorStop(1, `hsl(${hue2}, 70%, 5%)`);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
