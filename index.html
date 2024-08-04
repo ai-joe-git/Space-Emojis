@@ -110,7 +110,8 @@
                 y: Math.random() * canvas.height,
                 type: type,
                 speed: 0.2 + Math.random() * 0.3,
-                size: 20 + Math.random() * 20
+                size: 20 + Math.random() * 20,
+                layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
             });
         }
 
@@ -129,20 +130,12 @@
         }
 
         function drawRocket() {
-            ctx.save();
-            ctx.translate(rocket.x, rocket.y);
-            ctx.rotate(Math.PI / 2);
             ctx.font = '40px Arial';
-            ctx.fillText('🚀', -20, 15);
-            ctx.restore();
+            ctx.fillText('🚀', rocket.x - 20, rocket.y + 15);
 
             if (rocket.flameActive) {
-                ctx.save();
-                ctx.translate(rocket.x - 25, rocket.y);
-                ctx.rotate(Math.PI / 2);
                 ctx.font = '30px Arial';
-                ctx.fillText('🔥', -15 + Math.random() * 5, 15 + Math.random() * 5);
-                ctx.restore();
+                ctx.fillText('🔥', rocket.x - 45 + Math.random() * 5, rocket.y + 15 + Math.random() * 5);
             }
         }
 
@@ -164,7 +157,10 @@
             ctx.fillStyle = '#fff';
             stars.forEach(star => {
                 if (star.type) {
-                    ctx.font = `${star.size}px Arial`;
+                    let size = star.size;
+                    if (star.layer === 0) size *= 0.5;
+                    else if (star.layer === 2) size *= 1.5;
+                    ctx.font = `${size}px Arial`;
                     ctx.fillText(star.type, star.x, star.y);
                 } else {
                     ctx.beginPath();
@@ -181,7 +177,6 @@
                 ctx.fillStyle = `rgba(${particle.color.join(',')},${particle.alpha})`;
                 ctx.fill();
 
-                particle.velocity.y += 0.04;
                 particle.x += particle.velocity.x;
                 particle.y += particle.velocity.y;
                 particle.alpha -= 0.02;
@@ -314,13 +309,18 @@
 
                 createParticle(rocket.x + 20, rocket.y, particleColor, isLaser);
 
-                enemies.forEach((enemy, index) => {
-                    if (Math.abs(enemy.x - rocket.x) < 100) {
-                        enemies.splice(index, 1);
-                        score += 10;
-                        for (let i = 0; i < 20; i++) {
-                            createParticle(enemy.x, enemy.y, particleColor);
-                        }
+                // Check for collisions with enemies
+                particles.forEach(particle => {
+                    if (particle.velocity.x > 0) { // Only check forward-moving particles
+                        enemies.forEach((enemy, index) => {
+                            if (Math.abs(enemy.x - particle.x) < 15 && Math.abs(enemy.y - particle.y) < 15) {
+                                enemies.splice(index, 1);
+                                score += 10;
+                                for (let i = 0; i < 20; i++) {
+                                    createParticle(enemy.x, enemy.y, particleColor);
+                                }
+                            }
+                        });
                     }
                 });
             }
