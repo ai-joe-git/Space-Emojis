@@ -60,14 +60,16 @@
         let player = {
             x: 50,
             y: canvas.height / 2,
-            width: 50,
-            height: 50,
-            speed: 10, // Increased speed
+            width: 60,
+            height: 60,
+            speed: 5,
             emoji: '🚀',
             fuel: 200,
             maxFuel: 200,
             refuelRate: 0.5,
-            fuelConsumptionRate: 1
+            fuelConsumptionRate: 1,
+            hasWeapon: false,
+            weaponDuration: 0
         };
 
         let projectiles = [];
@@ -85,7 +87,7 @@
         let isJetpackActive = false;
         let flames = [];
         let lastShootTime = 0;
-        let shootInterval = 500; // Auto-shoot every 500ms
+        let shootInterval = 500;
 
         let backgroundStars = [];
         for (let i = 0; i < 100; i++) {
@@ -132,27 +134,31 @@
         }
 
         function spawnPowerUp() {
+            const powerUpTypes = ['🔫', '🔥', '❄️'];
             let powerUp = {
                 x: canvas.width,
                 y: Math.random() * (canvas.height - 30),
                 width: 30,
                 height: 30,
                 speed: 1 + Math.random() * 2,
-                emoji: '⭐'
+                emoji: powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)],
+                duration: 5000 // 5 seconds
             };
             powerUps.push(powerUp);
         }
 
         function shoot() {
-            let projectile = {
-                x: player.x + player.width,
-                y: player.y + player.height / 2 - 2.5,
-                width: 10,
-                height: 5,
-                speed: 10,
-                emoji: '🔥'
-            };
-            projectiles.push(projectile);
+            if (player.hasWeapon) {
+                let projectile = {
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2 - 2.5,
+                    width: 10,
+                    height: 5,
+                    speed: 10,
+                    emoji: '🔥'
+                };
+                projectiles.push(projectile);
+            }
         }
 
         function createParticles(x, y, color) {
@@ -199,11 +205,16 @@
         function update() {
             if (isGameOver) return;
 
-            // Auto-shoot
-            const now = Date.now();
-            if (now - lastShootTime > shootInterval) {
-                shoot();
-                lastShootTime = now;
+            if (player.hasWeapon) {
+                const now = Date.now();
+                if (now - lastShootTime > shootInterval) {
+                    shoot();
+                    lastShootTime = now;
+                }
+                player.weaponDuration -= 16; // Assume 60 FPS
+                if (player.weaponDuration <= 0) {
+                    player.hasWeapon = false;
+                }
             }
 
             if (isJetpackActive && player.fuel > 0) {
@@ -299,7 +310,8 @@
                     powerUps.splice(powerUpIndex, 1);
                     createParticles(powerUp.x, powerUp.y, 'yellow');
                     score += 50;
-                    lives = Math.min(lives + 1, 5);
+                    player.hasWeapon = true;
+                    player.weaponDuration = powerUp.duration;
                 }
             });
 
@@ -374,13 +386,14 @@
                 ctx.fillText(element.type, element.x, element.y);
             });
 
-            ctx.font = '40px Arial';
+            ctx.font = '50px Arial';
             ctx.fillText(player.emoji, player.x, player.y + player.height);
 
             flames.forEach(flame => {
                 ctx.fillText('🔥', flame.x - 20, flame.y);
             });
 
+            ctx.font = '40px Arial';
             projectiles.forEach(projectile => {
                 ctx.fillText(projectile.emoji, projectile.x, projectile.y + projectile.height);
             });
@@ -412,15 +425,18 @@
             ctx.fillText(`Level: ${level}`, 10, 60);
             ctx.fillText(`Lives: ${'❤️'.repeat(lives)}`, 10, 90);
             ctx.fillText(`Multiplier: x${hitMultiplier}`, 10, 120);
+            if (player.hasWeapon) {
+                ctx.fillText(`Weapon: ${Math.ceil(player.weaponDuration / 1000)}s`, 10, 150);
+            }
 
             // Draw fuel bar
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fillRect(10, 150, 100, 10);
+            ctx.fillRect(10, 180, 100, 10);
             ctx.fillStyle = 'rgb(0, 255, 0)';
-            ctx.fillRect(10, 150, (player.fuel / player.maxFuel) * 100, 10);
+            ctx.fillRect(10, 180, (player.fuel / player.maxFuel) * 100, 10);
 
             if (screenFlashOpacity > 0) {
-                ctx.fillStyle = `rgba(255, 255, 255, ${screenFlashOpacity})`;
+                ctx.fillStyle = `rgba(255, 0, 0, ${screenFlashOpacity})`;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
@@ -435,14 +451,16 @@
             player = {
                 x: 50,
                 y: canvas.height / 2,
-                width: 50,
-                height: 50,
-                speed: 10, // Increased speed
+                width: 60,
+                height: 60,
+                speed: 5,
                 emoji: '🚀',
                 fuel: 200,
                 maxFuel: 200,
                 refuelRate: 0.5,
-                fuelConsumptionRate: 1
+                fuelConsumptionRate: 1,
+                hasWeapon: false,
+                weaponDuration: 0
             };
             projectiles = [];
             enemies = [];
