@@ -18,6 +18,8 @@
         }
         #gameCanvas {
             border: 2px solid #fff;
+            max-width: 98vw;
+            max-height: 98vh;
         }
         #menu {
             position: absolute;
@@ -65,8 +67,8 @@
         let canvasWidth, canvasHeight;
 
         function resizeCanvas() {
-            canvasWidth = window.innerWidth;
-            canvasHeight = window.innerHeight;
+            canvasWidth = Math.min(window.innerWidth * 0.98, window.innerHeight * 0.98 * (16/9));
+            canvasHeight = canvasWidth * (9/16);
             canvas.width = canvasWidth;
             canvas.height = canvasHeight;
             // Adjust game elements based on new canvas size
