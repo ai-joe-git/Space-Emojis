@@ -114,25 +114,35 @@
             });
         }
 
-        function createParticle(x, y, color) {
+        function createParticle(x, y, color, isLaser = false) {
             particles.push({
                 x: x,
                 y: y,
                 radius: Math.random() * 3,
                 color: color,
                 velocity: {
-                    x: (Math.random() - 0.5) * 5,
-                    y: (Math.random() - 0.5) * 5
+                    x: isLaser ? 10 : (Math.random() - 0.5) * 5,
+                    y: isLaser ? 0 : (Math.random() - 0.5) * 5
                 },
                 alpha: 1
             });
         }
 
         function drawRocket() {
+            ctx.save();
+            ctx.translate(rocket.x, rocket.y);
+            ctx.rotate(Math.PI / 2);
             ctx.font = '40px Arial';
-            ctx.fillText('🚀', rocket.x - 20, rocket.y + 15);
+            ctx.fillText('🚀', -20, 15);
+            ctx.restore();
+
             if (rocket.flameActive) {
-                ctx.fillText('🔥', rocket.x - 20, rocket.y + 40);
+                ctx.save();
+                ctx.translate(rocket.x - 25, rocket.y);
+                ctx.rotate(Math.PI / 2);
+                ctx.font = '30px Arial';
+                ctx.fillText('🔥', -15 + Math.random() * 5, 15 + Math.random() * 5);
+                ctx.restore();
             }
         }
 
@@ -214,6 +224,11 @@
                 rocket.velocity = 0;
             }
 
+            // Add a very small amount of smoothing to downward movement
+            if (rocket.velocity > 0) {
+                rocket.velocity *= 0.99;
+            }
+
             enemies.forEach((enemy, index) => {
                 switch(enemy.behavior) {
                     case 'chase':
@@ -282,19 +297,22 @@
                 }
 
                 let particleColor;
+                let isLaser = false;
                 switch(activePowerUp) {
                     case '🔫':
                         particleColor = [0, 0, 255]; // Blue
+                        isLaser = true;
                         break;
                     case '🔥':
                         particleColor = [255, 0, 0]; // Red
+                        isLaser = true;
                         break;
                     case '❄️':
                         particleColor = [255, 255, 255]; // White
                         break;
                 }
 
-                createParticle(rocket.x + 20, rocket.y, particleColor);
+                createParticle(rocket.x + 20, rocket.y, particleColor, isLaser);
 
                 enemies.forEach((enemy, index) => {
                     if (Math.abs(enemy.x - rocket.x) < 100) {
