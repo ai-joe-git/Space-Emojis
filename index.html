@@ -33,14 +33,6 @@
             margin-top: 20px;
             cursor: pointer;
         }
-        #shootButton {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            font-size: 24px;
-            padding: 10px 20px;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
@@ -50,7 +42,6 @@
         <span id="finalScore"></span><br>
         <button id="restartButton">Restart</button>
     </div>
-    <button id="shootButton">Shoot</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -58,7 +49,6 @@
         const gameOverScreen = document.getElementById('gameOver');
         const finalScoreDisplay = document.getElementById('finalScore');
         const restartButton = document.getElementById('restartButton');
-        const shootButton = document.getElementById('shootButton');
 
         function resizeCanvas() {
             canvas.width = window.innerWidth * 0.95;
@@ -94,6 +84,8 @@
         let lives = 3;
         let isJetpackActive = false;
         let flames = [];
+        let lastShootTime = 0;
+        let shootInterval = 500; // Auto-shoot every 500ms
 
         let backgroundStars = [];
         for (let i = 0; i < 100; i++) {
@@ -204,16 +196,31 @@
             });
         }
 
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+
         function update() {
             if (isGameOver) return;
 
+            // Auto-shoot
+            const now = Date.now();
+            if (now - lastShootTime > shootInterval) {
+                shoot();
+                lastShootTime = now;
+            }
+
+            let targetY = player.y;
             if (isJetpackActive && player.fuel > 0) {
-                player.y -= player.speed;
+                targetY -= player.speed;
                 player.fuel -= player.fuelConsumptionRate;
                 createFlames();
             } else {
-                player.y += player.speed;
+                targetY += player.speed;
             }
+
+            // Smooth movement
+            player.y = lerp(player.y, targetY, 0.1);
 
             if (!isJetpackActive && player.fuel < player.maxFuel) {
                 player.fuel += player.refuelRate;
@@ -346,21 +353,24 @@
         }
 
         function draw() {
+            // Brighter background
             const hue = 220 + (level * 10) % 360;
             let gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, `hsl(${hue}, 70%, 15%)`);
-            gradient.addColorStop(1, `hsl(${(hue + 30) % 360}, 70%, 5%)`);
+            gradient.addColorStop(0, `hsl(${hue}, 70%, 25%)`); // Increased brightness
+            gradient.addColorStop(1, `hsl(${(hue + 30) % 360}, 70%, 15%)`); // Increased brightness
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            // Brighter stars
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Increased opacity
             backgroundStars.forEach(star => {
                 ctx.beginPath();
                 ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
                 ctx.fill();
             });
 
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            // More visible clouds
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; // Increased opacity
             clouds.forEach(cloud => {
                 ctx.beginPath();
                 ctx.ellipse(cloud.x, cloud.y, cloud.width / 2, cloud.height / 2, 0, 0, Math.PI * 2);
@@ -456,6 +466,7 @@
             lives = 3;
             isJetpackActive = false;
             flames = [];
+            lastShootTime = 0;
             gameOverScreen.style.display = 'none';
         }
 
@@ -495,12 +506,6 @@
         canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
             isJetpackActive = false;
-        });
-
-        shootButton.addEventListener('click', shoot);
-        shootButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            shoot();
         });
 
         restartButton.addEventListener('click', resetGame);
