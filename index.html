@@ -62,7 +62,7 @@
             y: canvas.height / 2,
             width: 50,
             height: 50,
-            speed: 5,
+            speed: 10, // Increased speed
             emoji: '🚀',
             fuel: 200,
             maxFuel: 200,
@@ -196,10 +196,6 @@
             });
         }
 
-        function lerp(start, end, t) {
-            return start * (1 - t) + end * t;
-        }
-
         function update() {
             if (isGameOver) return;
 
@@ -210,17 +206,13 @@
                 lastShootTime = now;
             }
 
-            let targetY = player.y;
             if (isJetpackActive && player.fuel > 0) {
-                targetY -= player.speed;
+                player.y -= player.speed;
                 player.fuel -= player.fuelConsumptionRate;
                 createFlames();
             } else {
-                targetY += player.speed;
+                player.y += player.speed;
             }
-
-            // Smooth movement
-            player.y = lerp(player.y, targetY, 0.1);
 
             if (!isJetpackActive && player.fuel < player.maxFuel) {
                 player.fuel += player.refuelRate;
@@ -353,24 +345,24 @@
         }
 
         function draw() {
-            // Brighter background
+            // Background
             const hue = 220 + (level * 10) % 360;
             let gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, `hsl(${hue}, 70%, 25%)`); // Increased brightness
-            gradient.addColorStop(1, `hsl(${(hue + 30) % 360}, 70%, 15%)`); // Increased brightness
+            gradient.addColorStop(0, `hsl(${hue}, 50%, 20%)`);
+            gradient.addColorStop(1, `hsl(${(hue + 30) % 360}, 50%, 10%)`);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Brighter stars
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Increased opacity
+            // Stars
+            ctx.fillStyle = 'white';
             backgroundStars.forEach(star => {
                 ctx.beginPath();
                 ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
                 ctx.fill();
             });
 
-            // More visible clouds
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; // Increased opacity
+            // Clouds
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
             clouds.forEach(cloud => {
                 ctx.beginPath();
                 ctx.ellipse(cloud.x, cloud.y, cloud.width / 2, cloud.height / 2, 0, 0, Math.PI * 2);
@@ -445,7 +437,7 @@
                 y: canvas.height / 2,
                 width: 50,
                 height: 50,
-                speed: 5,
+                speed: 10, // Increased speed
                 emoji: '🚀',
                 fuel: 200,
                 maxFuel: 200,
