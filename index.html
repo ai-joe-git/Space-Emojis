@@ -132,16 +132,38 @@
         }
 
         function createStar() {
-            const objectSet = gameTime < 30 * 60 ? cloudObjects : spaceObjects;
-            const type = objectSet[Math.floor(Math.random() * objectSet.length)];
-            stars.push({
-                x: canvas.width,
-                y: Math.random() * canvas.height,
-                type: type,
-                speed: 0.5 + Math.random() * 1.5,
-                size: 10 + Math.random() * 20,
-                layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
-            });
+            if (gameTime < 30 * 60) {
+                const type = cloudObjects[Math.floor(Math.random() * cloudObjects.length)];
+                stars.push({
+                    x: canvas.width,
+                    y: Math.random() * canvas.height,
+                    type: type,
+                    speed: 0.5 + Math.random() * 1.5,
+                    size: 10 + Math.random() * 20,
+                    layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
+                });
+            } else {
+                if (Math.random() < 0.4) {  // 40% chance for emoji stars
+                    const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
+                    stars.push({
+                        x: canvas.width,
+                        y: Math.random() * canvas.height,
+                        type: type,
+                        speed: 0.5 + Math.random() * 1.5,
+                        size: 10 + Math.random() * 20,
+                        layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
+                    });
+                } else {  // 60% chance for white dot stars
+                    stars.push({
+                        x: canvas.width,
+                        y: Math.random() * canvas.height,
+                        type: 'dot',
+                        speed: 0.5 + Math.random() * 1.5,
+                        size: 1 + Math.random() * 2,
+                        layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
+                    });
+                }
+            }
         }
 
         function createParticle(x, y, color, isLaser = false) {
@@ -185,11 +207,17 @@
         function drawStars() {
             ctx.fillStyle = '#fff';
             stars.forEach(star => {
-                let size = star.size;
-                if (star.layer === 0) size *= 0.5;
-                else if (star.layer === 2) size *= 1.5;
-                ctx.font = `${size}px Arial`;
-                ctx.fillText(star.type, star.x, star.y);
+                if (star.type === 'dot') {
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    let size = star.size;
+                    if (star.layer === 0) size *= 0.5;
+                    else if (star.layer === 2) size *= 1.5;
+                    ctx.font = `${size}px Arial`;
+                    ctx.fillText(star.type, star.x, star.y);
+                }
             });
         }
 
@@ -372,10 +400,10 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             drawStars();
-            drawParticles();
             drawRocket();
             drawEnemies();
             drawPowerUps();
+            drawParticles();
             drawScore();
             drawActivePowerUp();
         }
@@ -386,15 +414,6 @@
                 draw();
                 requestAnimationFrame(gameLoop);
             }
-        }
-
-        function gameOver() {
-            gameState = 'gameOver';
-            menu.style.display = 'block';
-            restartButton.style.display = 'block';
-            shareButton.style.display = 'block';
-            updateHighScores();
-            displayHighScores();
         }
 
         function resetGame() {
@@ -408,6 +427,16 @@
             activePowerUp = null;
             powerUpTimer = 0;
             gameTime = 0;
+        }
+
+        function gameOver() {
+            gameState = 'menu';
+            menu.style.display = 'block';
+            startButton.style.display = 'none';
+            restartButton.style.display = 'inline-block';
+            shareButton.style.display = 'inline-block';
+            updateHighScores();
+            displayHighScores();
         }
 
         function handleInput(e) {
