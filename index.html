@@ -42,6 +42,8 @@
         const enemies = [];
         const powerUps = [];
         const stars = [];
+        const particles = [];
+        const spaceObjects = ['🪐', '🌎', '☄️', '🌠'];
 
         let score = 0;
         let activePowerUp = null;
@@ -52,12 +54,34 @@
 
         function createEnemy() {
             const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-            enemies.push({
+            let enemy = {
                 x: canvas.width,
                 y: Math.random() * (canvas.height - 40),
                 type: type,
                 speed: 2 + Math.random() * 2
-            });
+            };
+
+            switch(type) {
+                case '🛸':
+                    enemy.behavior = 'chase';
+                    enemy.speed = 1.5;
+                    break;
+                case '👾':
+                    enemy.behavior = 'zigzag';
+                    enemy.amplitude = 50;
+                    enemy.frequency = 0.05;
+                    enemy.initialY = enemy.y;
+                    break;
+                case '👽':
+                    enemy.behavior = 'straight';
+                    break;
+                case '🦇':
+                    enemy.behavior = 'random';
+                    enemy.speed = 3 + Math.random() * 2;
+                    break;
+            }
+
+            enemies.push(enemy);
         }
 
         function createPowerUp() {
@@ -76,6 +100,31 @@
                 y: Math.random() * canvas.height,
                 speed: 0.5 + Math.random() * 1.5,
                 size: 1 + Math.random() * 2
+            });
+        }
+
+        function createSpaceObject() {
+            const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
+            stars.push({
+                x: canvas.width,
+                y: Math.random() * canvas.height,
+                type: type,
+                speed: 0.2 + Math.random() * 0.3,
+                size: 20 + Math.random() * 20
+            });
+        }
+
+        function createParticle(x, y, color) {
+            particles.push({
+                x: x,
+                y: y,
+                radius: Math.random() * 3,
+                color: color,
+                velocity: {
+                    x: (Math.random() - 0.5) * 5,
+                    y: (Math.random() - 0.5) * 5
+                },
+                alpha: 1
             });
         }
 
@@ -104,9 +153,32 @@
         function drawStars() {
             ctx.fillStyle = '#fff';
             stars.forEach(star => {
+                if (star.type) {
+                    ctx.font = `${star.size}px Arial`;
+                    ctx.fillText(star.type, star.x, star.y);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        function drawParticles() {
+            particles.forEach((particle, index) => {
                 ctx.beginPath();
-                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${particle.color.join(',')},${particle.alpha})`;
                 ctx.fill();
+
+                particle.velocity.y += 0.04;
+                particle.x += particle.velocity.x;
+                particle.y += particle.velocity.y;
+                particle.alpha -= 0.02;
+
+                if (particle.alpha <= 0) {
+                    particles.splice(index, 1);
+                }
             });
         }
 
@@ -125,7 +197,11 @@
         }
 
         function update() {
-            rocket.velocity += rocket.gravity;
+            if (rocket.flameActive) {
+                rocket.velocity = rocket.thrust;
+            } else {
+                rocket.velocity += rocket.gravity;
+            }
             rocket.y += rocket.velocity;
 
             if (rocket.y + rocket.radius > canvas.height) {
@@ -139,7 +215,29 @@
             }
 
             enemies.forEach((enemy, index) => {
-                enemy.x -= enemy.speed;
+                switch(enemy.behavior) {
+                    case 'chase':
+                        const dx = rocket.x - enemy.x;
+                        const dy = rocket.y - enemy.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        enemy.x += (dx / distance) * enemy.speed;
+                        enemy.y += (dy / distance) * enemy.speed;
+                        break;
+                    case 'zigzag':
+                        enemy.x -= enemy.speed;
+                        enemy.y = enemy.initialY + Math.sin(enemy.x * enemy.frequency) * enemy.amplitude;
+                        break;
+                    case 'straight':
+                        enemy.x -= enemy.speed;
+                        break;
+                    case 'random':
+                        enemy.x -= enemy.speed;
+                        enemy.y += (Math.random() - 0.5) * 5;
+                        if (enemy.y < 0) enemy.y = 0;
+                        if (enemy.y > canvas.height) enemy.y = canvas.height;
+                        break;
+                }
+
                 if (enemy.x < -30) {
                     enemies.splice(index, 1);
                 }
@@ -148,6 +246,9 @@
                     if (activePowerUp) {
                         enemies.splice(index, 1);
                         score += 10;
+                        for (let i = 0; i < 20; i++) {
+                            createParticle(enemy.x, enemy.y, [255, 0, 0]);
+                        }
                     } else {
                         gameOver();
                     }
@@ -169,7 +270,7 @@
 
             stars.forEach((star, index) => {
                 star.x -= star.speed;
-                if (star.x < 0) {
+                if (star.x < -30) {
                     stars.splice(index, 1);
                 }
             });
@@ -179,11 +280,37 @@
                 if (powerUpTimer <= 0) {
                     activePowerUp = null;
                 }
+
+                let particleColor;
+                switch(activePowerUp) {
+                    case '🔫':
+                        particleColor = [0, 0, 255]; // Blue
+                        break;
+                    case '🔥':
+                        particleColor = [255, 0, 0]; // Red
+                        break;
+                    case '❄️':
+                        particleColor = [255, 255, 255]; // White
+                        break;
+                }
+
+                createParticle(rocket.x + 20, rocket.y, particleColor);
+
+                enemies.forEach((enemy, index) => {
+                    if (Math.abs(enemy.x - rocket.x) < 100) {
+                        enemies.splice(index, 1);
+                        score += 10;
+                        for (let i = 0; i < 20; i++) {
+                            createParticle(enemy.x, enemy.y, particleColor);
+                        }
+                    }
+                });
             }
 
             if (Math.random() < 0.02) createEnemy();
             if (Math.random() < 0.005) createPowerUp();
             if (Math.random() < 0.1) createStar();
+            if (Math.random() < 0.001) createSpaceObject();
 
             score++;
         }
@@ -193,6 +320,7 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             drawStars();
+            drawParticles();
             drawRocket();
             drawEnemies();
             drawPowerUps();
@@ -217,6 +345,7 @@
             enemies.length = 0;
             powerUps.length = 0;
             stars.length = 0;
+            particles.length = 0;
             score = 0;
             activePowerUp = null;
             powerUpTimer = 0;
@@ -224,7 +353,6 @@
 
         function handleInput(e) {
             if (e.type === 'keydown' && e.code === 'Space' || e.type === 'touchstart') {
-                rocket.velocity = rocket.thrust;
                 rocket.flameActive = true;
             } else if (e.type === 'keyup' && e.code === 'Space' || e.type === 'touchend') {
                 rocket.flameActive = false;
