@@ -18,13 +18,46 @@
         #gameCanvas {
             border: 2px solid #fff;
         }
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #fff;
+            font-size: 24px;
+        }
+        button {
+            font-size: 20px;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #highScores {
+            color: #fff;
+            font-size: 18px;
+            text-align: left;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="menu">
+        <h1>Space Rocket Adventure</h1>
+        <button id="startButton">Start Game</button>
+        <button id="restartButton" style="display: none;">Restart Game</button>
+        <div id="highScores"></div>
+        <button id="shareButton" style="display: none;">Share Score</button>
+    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const menu = document.getElementById('menu');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const highScoresDiv = document.getElementById('highScores');
+        const shareButton = document.getElementById('shareButton');
 
         canvas.width = 400;
         canvas.height = 600;
@@ -43,11 +76,15 @@
         const powerUps = [];
         const stars = [];
         const particles = [];
-        const spaceObjects = ['🪐', '🌎', '☄️', '🌠'];
+        const spaceObjects = ['💫', '⭐', '🌟', '✨', '🌞', '🌝', '🌛', '🌜', '🌀', '☄️', '🪐', '🌑', '🌖', '🌕', '🌔', '🌓', '🌘'];
+        const cloudObjects = ['☁️'];
 
         let score = 0;
         let activePowerUp = null;
         let powerUpTimer = 0;
+        let gameState = 'menu';
+        let gameTime = 0;
+        let highScores = [];
 
         const enemyTypes = ['👾', '👽', '🦇', '🛸'];
         const powerUpTypes = ['🔫', '🔥', '❄️'];
@@ -95,22 +132,14 @@
         }
 
         function createStar() {
-            stars.push({
-                x: canvas.width,
-                y: Math.random() * canvas.height,
-                speed: 0.5 + Math.random() * 1.5,
-                size: 1 + Math.random() * 2
-            });
-        }
-
-        function createSpaceObject() {
-            const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
+            const objectSet = gameTime < 30 * 60 ? cloudObjects : spaceObjects;
+            const type = objectSet[Math.floor(Math.random() * objectSet.length)];
             stars.push({
                 x: canvas.width,
                 y: Math.random() * canvas.height,
                 type: type,
-                speed: 0.2 + Math.random() * 0.3,
-                size: 20 + Math.random() * 20,
+                speed: 0.5 + Math.random() * 1.5,
+                size: 10 + Math.random() * 20,
                 layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
             });
         }
@@ -156,17 +185,11 @@
         function drawStars() {
             ctx.fillStyle = '#fff';
             stars.forEach(star => {
-                if (star.type) {
-                    let size = star.size;
-                    if (star.layer === 0) size *= 0.5;
-                    else if (star.layer === 2) size *= 1.5;
-                    ctx.font = `${size}px Arial`;
-                    ctx.fillText(star.type, star.x, star.y);
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                let size = star.size;
+                if (star.layer === 0) size *= 0.5;
+                else if (star.layer === 2) size *= 1.5;
+                ctx.font = `${size}px Arial`;
+                ctx.fillText(star.type, star.x, star.y);
             });
         }
 
@@ -202,6 +225,8 @@
         }
 
         function update() {
+            gameTime++;
+
             if (rocket.flameActive) {
                 rocket.velocity = rocket.thrust;
             } else {
@@ -280,7 +305,8 @@
 
             stars.forEach((star, index) => {
                 star.x -= star.speed;
-                if (star.x < -30) {
+                star.y += gameTime < 30 * 60 ? 0.5 : 0; // Move stars down during launch
+                if (star.x < -30 || star.y > canvas.height) {
                     stars.splice(index, 1);
                 }
             });
@@ -327,14 +353,23 @@
 
             if (Math.random() < 0.02) createEnemy();
             if (Math.random() < 0.005) createPowerUp();
-            if (Math.random() < 0.1) createStar();
-            if (Math.random() < 0.001) createSpaceObject();
-
+            if (Math.random() < 0.2) createStar(); // Increased frequency of star creation
             score++;
         }
 
         function draw() {
-            ctx.fillStyle = '#000';
+            // Create gradient background
+            let gradient;
+            if (gameTime < 30 * 60) {
+                gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, "#87CEEB");
+                gradient.addColorStop(1, "#E0F6FF");
+            } else {
+                gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, "#000033");
+                gradient.addColorStop(1, "#0000FF");
+            }
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             drawStars();
@@ -347,14 +382,20 @@
         }
 
         function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
+            if (gameState === 'playing') {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
         }
 
         function gameOver() {
-            alert(`Game Over! Your score: ${score}`);
-            resetGame();
+            gameState = 'gameOver';
+            menu.style.display = 'block';
+            restartButton.style.display = 'block';
+            shareButton.style.display = 'block';
+            updateHighScores();
+            displayHighScores();
         }
 
         function resetGame() {
@@ -367,6 +408,7 @@
             score = 0;
             activePowerUp = null;
             powerUpTimer = 0;
+            gameTime = 0;
         }
 
         function handleInput(e) {
@@ -378,12 +420,60 @@
             e.preventDefault();
         }
 
+        function startGame() {
+            gameState = 'playing';
+            menu.style.display = 'none';
+            resetGame();
+            gameLoop();
+        }
+
+        function updateHighScores() {
+            highScores.push(score);
+            highScores.sort((a, b) => b - a);
+            highScores = highScores.slice(0, 5);
+        }
+
+        function displayHighScores() {
+            highScoresDiv.innerHTML = '<h2>High Scores</h2>';
+            highScores.forEach((score, index) => {
+                highScoresDiv.innerHTML += `<p>${index + 1}. ${score}</p>`;
+            });
+        }
+
+        function shareScore() {
+            const canvas = document.getElementById('gameCanvas');
+            const dataUrl = canvas.toDataURL();
+            const img = new Image();
+            img.src = dataUrl;
+
+            const shareCanvas = document.createElement('canvas');
+            shareCanvas.width = canvas.width;
+            shareCanvas.height = canvas.height + 50;
+            const shareCtx = shareCanvas.getContext('2d');
+
+            img.onload = function() {
+                shareCtx.drawImage(img, 0, 0);
+                shareCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                shareCtx.fillRect(0, canvas.height, canvas.width, 50);
+                shareCtx.fillStyle = '#fff';
+                shareCtx.font = '20px Arial';
+                shareCtx.fillText(`Score: ${score}`, 10, canvas.height + 30);
+
+                const shareDataUrl = shareCanvas.toDataURL();
+                const shareWindow = window.open();
+                shareWindow.document.write('<img src="' + shareDataUrl + '" alt="Game Score"/>');
+                shareWindow.document.write('<p>Right-click on the image and select "Save image as..." to save and share your score!</p>');
+            };
+        }
+
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', startGame);
+        shareButton.addEventListener('click', shareScore);
+
         document.addEventListener('keydown', handleInput);
         document.addEventListener('keyup', handleInput);
         canvas.addEventListener('touchstart', handleInput);
         canvas.addEventListener('touchend', handleInput);
-
-        gameLoop();
     </script>
 </body>
 </html>
