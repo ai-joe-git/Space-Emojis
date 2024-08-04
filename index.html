@@ -76,7 +76,7 @@
         const powerUps = [];
         const stars = [];
         const particles = [];
-        const spaceObjects = ['💫', '⭐', '🌟', '✨', '🌞', '🌝', '🌛', '🌜', '🌀', '☄️', '🪐', '🌑', '🌖', '🌕', '🌔', '🌓', '🌘'];
+        const spaceObjects = ['💫', '⭐', '🌟', '✨', '🌞', '🌝', '🌛', '🌜', '🌀', '☄️', '🪐', '🌑'];
         const cloudObjects = ['☁️'];
 
         let score = 0;
@@ -244,7 +244,6 @@
                 rocket.velocity = 0;
             }
 
-            // Add a very small amount of smoothing to downward movement
             if (rocket.velocity > 0) {
                 rocket.velocity *= 0.99;
             }
@@ -335,9 +334,8 @@
 
                 createParticle(rocket.x + 20, rocket.y, particleColor, isLaser);
 
-                // Check for collisions with enemies
                 particles.forEach(particle => {
-                    if (particle.velocity.x > 0) { // Only check forward-moving particles
+                    if (particle.velocity.x > 0) {
                         enemies.forEach((enemy, index) => {
                             if (Math.abs(enemy.x - particle.x) < 15 && Math.abs(enemy.y - particle.y) < 15) {
                                 enemies.splice(index, 1);
@@ -353,22 +351,23 @@
 
             if (Math.random() < 0.02) createEnemy();
             if (Math.random() < 0.005) createPowerUp();
-            if (Math.random() < 0.2) createStar(); // Increased frequency of star creation
+            if (Math.random() < 0.1) createStar(); // Reduced frequency of star creation
             score++;
         }
 
         function draw() {
-            // Create gradient background
-            let gradient;
-            if (gameTime < 30 * 60) {
-                gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                gradient.addColorStop(0, "#87CEEB");
-                gradient.addColorStop(1, "#E0F6FF");
-            } else {
-                gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                gradient.addColorStop(0, "#000033");
-                gradient.addColorStop(1, "#0000FF");
-            }
+            const transitionProgress = Math.min(gameTime / (60 * 60), 1); // 60 seconds transition
+            const skyBlue = [135, 206, 235];
+            const spaceBlue = [0, 0, 51];
+            
+            const r = Math.floor(skyBlue[0] + (spaceBlue[0] - skyBlue[0]) * transitionProgress);
+            const g = Math.floor(skyBlue[1] + (spaceBlue[1] - skyBlue[1]) * transitionProgress);
+            const b = Math.floor(skyBlue[2] + (spaceBlue[2] - skyBlue[2]) * transitionProgress);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
+            gradient.addColorStop(1, `rgb(${Math.max(r-20, 0)}, ${Math.max(g-20, 0)}, ${Math.max(b-20, 0)})`);
+
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -417,7 +416,6 @@
             } else if (e.type === 'keyup' && e.code === 'Space' || e.type === 'touchend') {
                 rocket.flameActive = false;
             }
-            e.preventDefault();
         }
 
         function startGame() {
