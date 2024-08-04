@@ -62,11 +62,12 @@
             y: canvas.height / 2,
             width: 60,
             height: 60,
-            speed: 3.5,
+            speed: 3,
+            verticalSpeed: 1,
             emoji: '🚀',
-            fuel: 300,
-            maxFuel: 300,
-            refuelRate: 0.75,
+            fuel: 200,
+            maxFuel: 200,
+            refuelRate: 0.5,
             fuelConsumptionRate: 1,
             hasWeapon: false,
             weaponDuration: 0
@@ -83,7 +84,7 @@
         let multiplierEffects = [];
         let screenFlashOpacity = 0;
         let isGameOver = false;
-        let lives = 6;
+        let lives = 3;
         let isJetpackActive = false;
         let flames = [];
         let lastShootTime = 0;
@@ -122,13 +123,21 @@
         }
 
         function spawnEnemy() {
+            const enemyTypes = [
+                { emoji: '👾', attack: 'chase' },
+                { emoji: '👽', attack: 'shoot' },
+                { emoji: '🛸', attack: 'zigzag' }
+            ];
+            let enemyType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
             let enemy = {
                 x: canvas.width,
                 y: Math.random() * (canvas.height - 30),
                 width: 30,
                 height: 30,
-                speed: 2 + Math.random() * 3,
-                emoji: '👾'
+                speed: 1 + Math.random() * 2,
+                emoji: enemyType.emoji,
+                attack: enemyType.attack,
+                shootCooldown: 0
             };
             enemies.push(enemy);
         }
@@ -159,6 +168,18 @@
                 };
                 projectiles.push(projectile);
             }
+        }
+
+        function enemyShoot(enemy) {
+            let projectile = {
+                x: enemy.x,
+                y: enemy.y + enemy.height / 2,
+                width: 10,
+                height: 5,
+                speed: -5,
+                emoji: '💥'
+            };
+            projectiles.push(projectile);
         }
 
         function createParticles(x, y, color) {
@@ -218,11 +239,11 @@
             }
 
             if (isJetpackActive && player.fuel > 0) {
-                player.y -= player.speed;
+                player.y -= player.verticalSpeed;
                 player.fuel -= player.fuelConsumptionRate;
                 createFlames();
             } else {
-                player.y += player.speed;
+                player.y += player.verticalSpeed;
             }
 
             if (!isJetpackActive && player.fuel < player.maxFuel) {
@@ -257,12 +278,28 @@
 
             projectiles.forEach((projectile, index) => {
                 projectile.x += projectile.speed;
-                if (projectile.x > canvas.width) {
+                if (projectile.x > canvas.width || projectile.x < 0) {
                     projectiles.splice(index, 1);
                 }
             });
 
             enemies.forEach((enemy, enemyIndex) => {
+                switch(enemy.attack) {
+                    case 'chase':
+                        enemy.y += (player.y - enemy.y) * 0.02;
+                        break;
+                    case 'zigzag':
+                        enemy.y += Math.sin(Date.now() * 0.01) * 2;
+                        break;
+                    case 'shoot':
+                        if (enemy.shootCooldown <= 0) {
+                            enemyShoot(enemy);
+                            enemy.shootCooldown = 120;
+                        }
+                        enemy.shootCooldown--;
+                        break;
+                }
+
                 enemy.x -= enemy.speed;
 
                 if (enemy.x + enemy.width < 0) {
@@ -415,25 +452,27 @@
 
             multiplierEffects.forEach(effect => {
                 ctx.fillStyle = `rgba(255, 255, 0, ${effect.opacity})`;
-                ctx.font = '20px Arial';
+                ctx.font = '24px Arial';
                 ctx.fillText(`x${effect.multiplier}`, effect.x, effect.y);
             });
 
             ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
+            ctx.font = '24px Arial';
             ctx.fillText(`Score: ${score}`, 10, 30);
             ctx.fillText(`Level: ${level}`, 10, 60);
             ctx.fillText(`Lives: ${'❤️'.repeat(lives)}`, 10, 90);
-            ctx.fillText(`Multiplier: x${hitMultiplier}`, 10, 120);
-            if (player.hasWeapon) {
-                ctx.fillText(`Weapon: ${Math.ceil(player.weaponDuration / 1000)}s`, 10, 150);
-            }
 
-            // Draw fuel bar
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fillRect(10, 180, 100, 10);
-            ctx.fillStyle = 'rgb(0, 255, 0)';
-            ctx.fillRect(10, 180, (player.fuel / player.maxFuel) * 100, 10);
+            ctx.fillStyle = player.fuel < 50 ? 'red' : 'white';
+            ctx.fillRect(10, canvas.height - 30, (player.fuel / player.maxFuel) * 200, 20);
+            ctx.strokeStyle = 'white';
+            ctx.strokeRect(10, canvas.height - 30, 200, 20);
+
+            if (player.hasWeapon) {
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(10, canvas.height - 60, (player.weaponDuration / 5000) * 200, 20);
+                ctx.strokeStyle = 'white';
+                ctx.strokeRect(10, canvas.height - 60, 200, 20);
+            }
 
             if (screenFlashOpacity > 0) {
                 ctx.fillStyle = `rgba(255, 0, 0, ${screenFlashOpacity})`;
@@ -453,11 +492,12 @@
                 y: canvas.height / 2,
                 width: 60,
                 height: 60,
-                speed: 4,
+                speed: 3,
+                verticalSpeed: 1,
                 emoji: '🚀',
-                fuel: 300,
-                maxFuel: 300,
-                refuelRate: 0.75,
+                fuel: 200,
+                maxFuel: 200,
+                refuelRate: 0.5,
                 fuelConsumptionRate: 1,
                 hasWeapon: false,
                 weaponDuration: 0
@@ -473,7 +513,7 @@
             multiplierEffects = [];
             screenFlashOpacity = 0;
             isGameOver = false;
-            lives = 4;
+            lives = 3;
             isJetpackActive = false;
             flames = [];
             lastShootTime = 0;
