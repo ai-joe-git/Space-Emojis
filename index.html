@@ -76,7 +76,7 @@
         const powerUps = [];
         const stars = [];
         const particles = [];
-        const spaceObjects = ['✨', '⭐', '🌟', '🛰️', '🌏', '🌝', '🌐', '🌍', '🌎', '☄️', '🪐', '🌑'];
+        const spaceObjects = ['✨', '🛰️', '🌏', '🌕', '🌍', '🌎', '☄️', '🪐', '🌑'];
         const cloudObjects = ['☁️'];
 
         let score = 0;
@@ -102,11 +102,12 @@
                 case '🛸':
                     enemy.behavior = 'chase';
                     enemy.speed = 2.5;
+                    enemy.frequency = 0.05;
                     break;
                 case '👾':
                     enemy.behavior = 'zigzag';
                     enemy.amplitude = 50;
-                    enemy.frequency = 0.05;
+                    enemy.frequency = 0.15;
                     enemy.initialY = enemy.y;
                     break;
                 case '👽':
