@@ -44,6 +44,12 @@
             text-align: left;
             margin-top: 20px;
         }
+        #audioControls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -55,6 +61,10 @@
         <div id="highScores"></div>
         <button id="shareButton" style="display: none;">Share Score</button>
     </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -63,15 +73,39 @@
         const restartButton = document.getElementById('restartButton');
         const highScoresDiv = document.getElementById('highScores');
         const shareButton = document.getElementById('shareButton');
+        const musicToggle = document.getElementById('musicToggle');
+        const sfxToggle = document.getElementById('sfxToggle');
 
         let canvasWidth, canvasHeight;
+
+        // Audio
+        const backgroundMusic = new Audio('https://example.com/background-music.mp3');
+        backgroundMusic.loop = true;
+        const powerUpSound = new Audio('https://example.com/powerup-sound.mp3');
+        const flameSound = new Audio('https://example.com/flame-sound.mp3');
+        flameSound.loop = true;
+
+        function toggleMusic() {
+            if (musicToggle.checked) {
+                backgroundMusic.play();
+            } else {
+                backgroundMusic.pause();
+            }
+        }
+
+        function playSoundEffect(sound) {
+            if (sfxToggle.checked) {
+                sound.play();
+            }
+        }
+
+        musicToggle.addEventListener('change', toggleMusic);
 
         function resizeCanvas() {
             canvasWidth = Math.min(window.innerWidth * 0.98, window.innerHeight * 0.98 * (16/9));
             canvasHeight = canvasWidth * (9/16);
             canvas.width = canvasWidth;
             canvas.height = canvasHeight;
-            // Adjust game elements based on new canvas size
             if (rocket) {
                 rocket.y = canvasHeight / 2;
             }
@@ -161,7 +195,7 @@
                     layer: Math.floor(Math.random() * 3)
                 });
             } else {
-                if (Math.random() < 0.05) {  // 5% chance for emoji stars
+                if (Math.random() < 0.05) {
                     const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
                     stars.push({
                         x: canvasWidth,
@@ -171,7 +205,7 @@
                         size: 10 + Math.random() * 20,
                         layer: Math.floor(Math.random() * 3)
                     });
-                } else {  // 95% chance for white dot stars
+                } else {
                     stars.push({
                         x: canvasWidth,
                         y: Math.random() * canvasHeight,
@@ -275,8 +309,10 @@
 
             if (rocket.flameActive) {
                 rocket.velocity = rocket.thrust;
+                playSoundEffect(flameSound);
             } else {
                 rocket.velocity += rocket.gravity;
+                flameSound.pause();
             }
             rocket.y += rocket.velocity;
 
@@ -345,6 +381,7 @@
                     activePowerUp = powerUp.type;
                     powerUpTimer = 10 * 60; // 10 seconds * 60 fps
                     powerUps.splice(index, 1);
+                    playSoundEffect(powerUpSound);
                 }
             });
 
@@ -383,138 +420,144 @@
                 particles.forEach(particle => {
                     if (particle.velocity.x > 0) {
                         enemies.forEach((enemy, index) => {
-                            if (Math.abs(enemy.x - particle.x) < 15 && Math.abs(enemy.y - particle.y) < 15) {
-                                enemies.splice(index, 1);
-                                score += 10;
-                                for (let i = 0; i < 20; i++) {
-                                    createParticle(enemy.x, enemy.y, particleColor);
-                                }
-                            }
-                        });
+                    if (Math.abs(enemy.x - particle.x) < 15 && Math.abs(enemy.y - particle.y) < 15) {
+                        enemies.splice(index, 1);
+                        score += 10;
+                        for (let i = 0; i < 20; i++) {
+                            createParticle(enemy.x, enemy.y, [255, 0, 0]);
+                        }
                     }
                 });
             }
+        });
+    }
 
-            if (Math.random() < 0.02) createEnemy();
-            if (Math.random() < 0.005) createPowerUp();
-            if (Math.random() < 0.1) createStar();
-            score++;
-        }
+    if (Math.random() < 0.02) createEnemy();
+    if (Math.random() < 0.005) createPowerUp();
+    if (Math.random() < 0.1) createStar();
 
-        function draw() {
-            const transitionProgress = Math.min(gameTime / (60 * 60), 1); // 60 seconds transition
-            const skyBlue = [135, 206, 235];
-            const spaceBlue = [0, 0, 51];
-            
-            const r = Math.floor(skyBlue[0] + (spaceBlue[0] - skyBlue[0]) * transitionProgress);
-            const g = Math.floor(skyBlue[1] + (spaceBlue[1] - skyBlue[1]) * transitionProgress);
-            const b = Math.floor(skyBlue[2] + (spaceBlue[2] - skyBlue[2]) * transitionProgress);
+    score++;
+}
 
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-            gradient.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
-            gradient.addColorStop(1, `rgb(${Math.max(0, r-20)}, ${Math.max(0, g-20)}, ${Math.max(0, b-20)})`);
+function draw() {
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    const skyBlue = [135, 206, 235];
+    const spaceBlue = [0, 0, 50];
+    const transitionProgress = Math.min(gameTime / (30 * 60), 1);
 
-            drawStars();
-            drawRocket();
-            drawEnemies();
-            drawPowerUps();
-            drawParticles();
-            drawScore();
-            drawActivePowerUp();
-        }
+    const r = Math.floor(skyBlue[0] + (spaceBlue[0] - skyBlue[0]) * transitionProgress);
+    const g = Math.floor(skyBlue[1] + (spaceBlue[1] - skyBlue[1]) * transitionProgress);
+    const b = Math.floor(skyBlue[2] + (spaceBlue[2] - skyBlue[2]) * transitionProgress);
 
-        function gameLoop() {
-            if (gameState === 'playing') {
-                update();
-                draw();
-                requestAnimationFrame(gameLoop);
-            }
-        }
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+    gradient.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
+    gradient.addColorStop(1, `rgb(${Math.max(0, r-20)}, ${Math.max(0, g-20)}, ${Math.max(0, b-20)})`);
 
-        function resetGame() {
-            rocket.y = canvasHeight / 2;
-            rocket.velocity = 0;
-            enemies.length = 0;
-            powerUps.length = 0;
-            stars.length = 0;
-            particles.length = 0;
-            score = 0;
-            activePowerUp = null;
-            powerUpTimer = 0;
-            gameTime = 0;
-        }
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        function gameOver() {
-            gameState = 'menu';
-            menu.style.display = 'block';
-            startButton.style.display = 'none';
-            restartButton.style.display = 'inline-block';
-            shareButton.style.display = 'inline-block';
-            updateHighScores();
-            displayHighScores();
-        }
+    drawStars();
+    drawRocket();
+    drawEnemies();
+    drawPowerUps();
+    drawParticles();
+    drawScore();
+    drawActivePowerUp();
+}
 
-        function handleInput(e) {
-            if (e.type === 'keydown' && e.code === 'Space' || e.type === 'touchstart') {
-                rocket.flameActive = true;
-            } else if (e.type === 'keyup' && e.code === 'Space' || e.type === 'touchend') {
-                rocket.flameActive = false;
-            }
-        }
+function gameLoop() {
+    if (gameState === 'playing') {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+}
 
-        function startGame() {
-            gameState = 'playing';
-            menu.style.display = 'none';
-            resetGame();
-            gameLoop();
-        }
+function resetGame() {
+    rocket.y = canvasHeight / 2;
+    rocket.velocity = 0;
+    enemies.length = 0;
+    powerUps.length = 0;
+    stars.length = 0;
+    particles.length = 0;
+    score = 0;
+    activePowerUp = null;
+    powerUpTimer = 0;
+    gameTime = 0;
+}
 
-        function updateHighScores() {
-            highScores.push(score);
-            highScores.sort((a, b) => b - a);
-            highScores = highScores.slice(0, 5);
-        }
+function gameOver() {
+    gameState = 'menu';
+    menu.style.display = 'block';
+    startButton.style.display = 'none';
+    restartButton.style.display = 'inline-block';
+    shareButton.style.display = 'inline-block';
+    updateHighScores();
+    displayHighScores();
+    backgroundMusic.pause();
+    backgroundMusic.currentTime = 0;
+}
 
-        function displayHighScores() {
-            highScoresDiv.innerHTML = '<h2>High Scores</h2>';
-            highScores.forEach((score, index) => {
-                highScoresDiv.innerHTML += `<p>${index + 1}. ${score}</p>`;
-            });
-        }
+function handleInput(e) {
+    if (e.type === 'keydown' && e.code === 'Space' || e.type === 'touchstart') {
+        rocket.flameActive = true;
+    } else if (e.type === 'keyup' && e.code === 'Space' || e.type === 'touchend') {
+        rocket.flameActive = false;
+    }
+}
 
-        function shareScore() {
-            const shareCanvas = document.createElement('canvas');
-            shareCanvas.width = canvasWidth;
-            shareCanvas.height = canvasHeight + 50;
-            const shareCtx = shareCanvas.getContext('2d');
+function startGame() {
+    gameState = 'playing';
+    menu.style.display = 'none';
+    resetGame();
+    toggleMusic();
+    gameLoop();
+}
 
-            shareCtx.drawImage(canvas, 0, 0);
-            shareCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            shareCtx.fillRect(0, canvasHeight, canvasWidth, 50);
-            shareCtx.fillStyle = '#fff';
-            shareCtx.font = '20px Arial';
-            shareCtx.fillText(`Score: ${score}`, 10, canvasHeight + 30);
+function updateHighScores() {
+    highScores.push(score);
+    highScores.sort((a, b) => b - a);
+    highScores = highScores.slice(0, 5);
+}
 
-            const shareDataUrl = shareCanvas.toDataURL();
-            const shareWindow = window.open();
-            shareWindow.document.write('<img src="' + shareDataUrl + '" alt="Game Score"/>');
-            shareWindow.document.write('<p>Right-click on the image and select "Save image as..." to save and share your score!</p>');
-        }
+function displayHighScores() {
+    highScoresDiv.innerHTML = '<h2>High Scores</h2>';
+    highScores.forEach((score, index) => {
+        highScoresDiv.innerHTML += `<p>${index + 1}. ${score}</p>`;
+    });
+}
 
-        startButton.addEventListener('click', startGame);
-        restartButton.addEventListener('click', startGame);
-        shareButton.addEventListener('click', shareScore);
+function shareScore() {
+    const shareCanvas = document.createElement('canvas');
+    shareCanvas.width = canvasWidth;
+    shareCanvas.height = canvasHeight + 50;
+    const shareCtx = shareCanvas.getContext('2d');
 
-        document.addEventListener('keydown', handleInput);
-        document.addEventListener('keyup', handleInput);
-        canvas.addEventListener('touchstart', handleInput);
-        canvas.addEventListener('touchend', handleInput);
+    shareCtx.drawImage(canvas, 0, 0);
+    shareCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    shareCtx.fillRect(0, canvasHeight, canvasWidth, 50);
+    shareCtx.fillStyle = '#fff';
+    shareCtx.font = '20px Arial';
+    shareCtx.fillText(`Score: ${score}`, 10, canvasHeight + 30);
 
-        // Initial display of high scores
-        displayHighScores();
+    const shareDataUrl = shareCanvas.toDataURL();
+    const shareWindow = window.open();
+    shareWindow.document.write('<img src="' + shareDataUrl + '" alt="Game Score"/>');
+    shareWindow.document.write('<p>Right-click on the image and select "Save image as..." to save and share your score!</p>');
+}
+
+startButton.addEventListener('click', startGame);
+restartButton.addEventListener('click', startGame);
+shareButton.addEventListener('click', shareScore);
+
+document.addEventListener('keydown', handleInput);
+document.addEventListener('keyup', handleInput);
+canvas.addEventListener('touchstart', handleInput);
+canvas.addEventListener('touchend', handleInput);
+
+// Initial display of high scores
+displayHighScores();
     </script>
 </body>
 </html>
