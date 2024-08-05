@@ -5,14 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Space Rocket Adventure</title>
     <style>
-        body, html {
+        body {
             margin: 0;
             padding: 0;
-            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            font-family: Arial, sans-serif;
             overflow: hidden;
         }
         #gameCanvas {
-            display: block;
+            border: 2px solid #fff;
+            max-width: 98vw;
+            max-height: 98vh;
         }
         #menu {
             position: absolute;
@@ -20,22 +27,22 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            font-family: Arial, sans-serif;
-            color: white;
-        }
-        #highScores {
-            margin-top: 20px;
+            color: #fff;
+            font-size: 24px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         button {
-            margin: 10px;
+            font-size: 20px;
             padding: 10px 20px;
-            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
         }
-        #audioControls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            color: white;
+        #highScores {
+            color: #fff;
+            font-size: 18px;
+            text-align: left;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -44,13 +51,9 @@
     <div id="menu">
         <h1>Space Rocket Adventure</h1>
         <button id="startButton">Start Game</button>
-        <button id="restartButton" style="display: none;">Restart</button>
-        <button id="shareButton" style="display: none;">Share Score</button>
+        <button id="restartButton" style="display: none;">Restart Game</button>
         <div id="highScores"></div>
-    </div>
-    <div id="audioControls">
-        <label><input type="checkbox" id="musicToggle" checked> Music</label>
-        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+        <button id="shareButton" style="display: none;">Share Score</button>
     </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -58,174 +61,212 @@
         const menu = document.getElementById('menu');
         const startButton = document.getElementById('startButton');
         const restartButton = document.getElementById('restartButton');
-        const shareButton = document.getElementById('shareButton');
         const highScoresDiv = document.getElementById('highScores');
-        const musicToggle = document.getElementById('musicToggle');
-        const sfxToggle = document.getElementById('sfxToggle');
+        const shareButton = document.getElementById('shareButton');
 
-        let canvasWidth = window.innerWidth;
-        let canvasHeight = window.innerHeight;
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
-
-        let rocket = {
-            x: 50,
-            y: canvasHeight / 2,
-            width: 40,
-            height: 20,
-            velocity: 0,
-            flameActive: false
-        };
-
-        let enemies = [];
-        let powerUps = [];
-        let stars = [];
-        let particles = [];
-        let score = 0;
-        let highScores = [];
-        let gameState = 'menu';
-        let activePowerUp = null;
-        let powerUpTimer = 0;
-        let gameTime = 0;
-
-        const backgroundMusic = new Audio('https://example.com/background-music.mp3');
-        backgroundMusic.loop = true;
-        const powerUpSound = new Audio('https://example.com/powerup-sound.mp3');
-        const flameSound = new Audio('https://example.com/flame-sound.mp3');
-        flameSound.loop = true;
+        let canvasWidth, canvasHeight;
 
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            canvasWidth = canvas.width;
-            canvasHeight = canvas.height;
-            
-            // Update rocket position
+            canvasWidth = Math.min(window.innerWidth * 0.98, window.innerHeight * 0.98 * (16/9));
+            canvasHeight = canvasWidth * (9/16);
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            // Adjust game elements based on new canvas size
             if (rocket) {
                 rocket.y = canvasHeight / 2;
-            }
-            
-            // Redraw the game if it's already started
-            if (gameState === 'playing') {
-                draw();
             }
         }
 
         window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-        function toggleMusic() {
-            if (musicToggle.checked) {
-                backgroundMusic.play();
-            } else {
-                backgroundMusic.pause();
-            }
-        }
+        const rocket = {
+            x: 50,
+            y: canvasHeight / 2,
+            radius: 20,
+            velocity: 0,
+            gravity: 0.2,
+            thrust: -4,
+            flameActive: false
+        };
 
-        function playSoundEffect(sound) {
-            if (sfxToggle.checked) {
-                sound.play();
-            }
-        }
+        const enemies = [];
+        const powerUps = [];
+        const stars = [];
+        const particles = [];
+        const spaceObjects = ['💫', '⭐', '🌟', '✨', '🌞', '🌝', '🌛', '🌜', '🌀', '☄️', '🪐', '🌑'];
+        const cloudObjects = ['☁️'];
 
-        function createStar() {
-            stars.push({
-                x: canvasWidth,
-                y: Math.random() * canvasHeight,
-                size: Math.random() * 2 + 1,
-                speed: Math.random() * 3 + 1
-            });
-        }
+        let score = 0;
+        let activePowerUp = null;
+        let powerUpTimer = 0;
+        let gameState = 'menu';
+        let gameTime = 0;
+        let highScores = [];
+
+        const enemyTypes = ['👾', '👽', '🦇', '🛸'];
+        const powerUpTypes = ['🔫', '🔥', '❄️'];
 
         function createEnemy() {
-            enemies.push({
+            const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            let enemy = {
                 x: canvasWidth,
-                y: Math.random() * (canvasHeight - 20),
-                width: 20,
-                height: 20,
-                speed: Math.random() * 2 + 1
-            });
+                y: Math.random() * (canvasHeight - 40),
+                type: type,
+                speed: 2 + Math.random() * 2
+            };
+
+            switch(type) {
+                case '🛸':
+                    enemy.behavior = 'chase';
+                    enemy.speed = 1.5;
+                    break;
+                case '👾':
+                    enemy.behavior = 'zigzag';
+                    enemy.amplitude = 50;
+                    enemy.frequency = 0.05;
+                    enemy.initialY = enemy.y;
+                    break;
+                case '👽':
+                    enemy.behavior = 'straight';
+                    break;
+                case '🦇':
+                    enemy.behavior = 'random';
+                    enemy.speed = 3 + Math.random() * 2;
+                    break;
+            }
+
+            enemies.push(enemy);
         }
 
         function createPowerUp() {
+            const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
             powerUps.push({
                 x: canvasWidth,
-                y: Math.random() * (canvasHeight - 15),
-                width: 15,
-                height: 15,
-                speed: 2,
-                type: Math.random() < 0.5 ? 'invincibility' : 'scoreMultiplier'
+                y: Math.random() * (canvasHeight - 40),
+                type: type,
+                speed: 1.5
             });
         }
 
-        function createParticle(x, y, color) {
+        function createStar() {
+            if (gameTime < 30 * 60) {
+                const type = cloudObjects[Math.floor(Math.random() * cloudObjects.length)];
+                stars.push({
+                    x: canvasWidth,
+                    y: Math.random() * canvasHeight,
+                    type: type,
+                    speed: 0.5 + Math.random() * 1.5,
+                    size: 10 + Math.random() * 20,
+                    layer: Math.floor(Math.random() * 3)
+                });
+            } else {
+                if (Math.random() < 0.05) {  // 5% chance for emoji stars
+                    const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
+                    stars.push({
+                        x: canvasWidth,
+                        y: Math.random() * canvasHeight,
+                        type: type,
+                        speed: 0.5 + Math.random() * 1.5,
+                        size: 10 + Math.random() * 20,
+                        layer: Math.floor(Math.random() * 3)
+                    });
+                } else {  // 95% chance for white dot stars
+                    stars.push({
+                        x: canvasWidth,
+                        y: Math.random() * canvasHeight,
+                        type: 'dot',
+                        speed: 0.5 + Math.random() * 1.5,
+                        size: 1 + Math.random() * 2,
+                        layer: Math.floor(Math.random() * 3)
+                    });
+                }
+            }
+        }
+
+        function createParticle(x, y, color, isLaser = false) {
             particles.push({
                 x: x,
                 y: y,
-                size: Math.random() * 3 + 1,
+                radius: Math.random() * 3,
                 color: color,
-                speedX: (Math.random() - 0.5) * 5,
-                speedY: (Math.random() - 0.5) * 5,
-                life: 30
+                velocity: {
+                    x: isLaser ? 10 : (Math.random() - 0.5) * 5,
+                    y: isLaser ? 0 : (Math.random() - 0.5) * 5
+                },
+                alpha: 1
             });
         }
 
         function drawRocket() {
-            ctx.fillStyle = '#FFA500';
-            ctx.fillRect(rocket.x, rocket.y, rocket.width, rocket.height);
+            ctx.font = '40px Arial';
+            ctx.fillText('🚀', rocket.x - 20, rocket.y + 15);
 
             if (rocket.flameActive) {
-                ctx.beginPath();
-                ctx.moveTo(rocket.x, rocket.y + 5);
-                ctx.lineTo(rocket.x - 15, rocket.y + rocket.height / 2);
-                ctx.lineTo(rocket.x, rocket.y + rocket.height - 5);
-                ctx.fillStyle = 'red';
-                ctx.fill();
+                ctx.font = '30px Arial';
+                ctx.fillText('🔥', rocket.x - 45 + Math.random() * 5, rocket.y + 15 + Math.random() * 5);
             }
         }
 
         function drawEnemies() {
-            ctx.fillStyle = 'red';
             enemies.forEach(enemy => {
-                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                ctx.font = '30px Arial';
+                ctx.fillText(enemy.type, enemy.x, enemy.y);
             });
         }
 
         function drawPowerUps() {
             powerUps.forEach(powerUp => {
-                ctx.fillStyle = powerUp.type === 'invincibility' ? 'gold' : 'purple';
-                ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
+                ctx.font = '30px Arial';
+                ctx.fillText(powerUp.type, powerUp.x, powerUp.y);
             });
         }
 
         function drawStars() {
-            ctx.fillStyle = 'white';
+            ctx.fillStyle = '#fff';
             stars.forEach(star => {
-                ctx.beginPath();
-                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                ctx.fill();
+                if (star.type === 'dot') {
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    let size = star.size;
+                    if (star.layer === 0) size *= 0.5;
+                    else if (star.layer === 2) size *= 1.5;
+                    ctx.font = `${size}px Arial`;
+                    ctx.fillText(star.type, star.x, star.y);
+                }
             });
         }
 
         function drawParticles() {
-            particles.forEach(particle => {
-                ctx.fillStyle = `rgba(${particle.color[0]}, ${particle.color[1]}, ${particle.color[2]}, ${particle.life / 30})`;
+            particles.forEach((particle, index) => {
                 ctx.beginPath();
-                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${particle.color.join(',')},${particle.alpha})`;
                 ctx.fill();
+
+                particle.x += particle.velocity.x;
+                particle.y += particle.velocity.y;
+                particle.alpha -= 0.02;
+
+                if (particle.alpha <= 0) {
+                    particles.splice(index, 1);
+                }
             });
         }
 
         function drawScore() {
-            ctx.fillStyle = 'white';
+            ctx.fillStyle = '#fff';
             ctx.font = '20px Arial';
             ctx.fillText(`Score: ${score}`, 10, 30);
         }
 
         function drawActivePowerUp() {
             if (activePowerUp) {
-                ctx.fillStyle = 'white';
-                ctx.font = '16px Arial';
-                ctx.fillText(`${activePowerUp} active!`, 10, 60);
+                ctx.fillStyle = '#fff';
+                ctx.font = '20px Arial';
+                ctx.fillText(`Power-up: ${activePowerUp} (${Math.ceil(powerUpTimer / 60)}s)`, 10, 60);
             }
         }
 
@@ -233,124 +274,138 @@
             gameTime++;
 
             if (rocket.flameActive) {
-                rocket.velocity -= 0.5;
-                playSoundEffect(flameSound);
+                rocket.velocity = rocket.thrust;
             } else {
-                rocket.velocity += 0.3;
-                flameSound.pause();
+                rocket.velocity += rocket.gravity;
             }
-
             rocket.y += rocket.velocity;
 
-            if (rocket.y < 0) {
-                rocket.y = 0;
-                rocket.velocity = 0;
-            } else if (rocket.y + rocket.height > canvasHeight) {
-                rocket.y = canvasHeight - rocket.height;
+            if (rocket.y + rocket.radius > canvasHeight) {
+                rocket.y = canvasHeight - rocket.radius;
                 rocket.velocity = 0;
             }
 
-            stars.forEach(star => {
-                star.x -= star.speed;
+            if (rocket.y - rocket.radius < 0) {
+                rocket.y = rocket.radius;
+                rocket.velocity = 0;
+            }
+
+            if (rocket.velocity > 0) {
+                rocket.velocity *= 0.99;
+            }
+
+            enemies.forEach((enemy, index) => {
+                switch(enemy.behavior) {
+                    case 'chase':
+                        const dx = rocket.x - enemy.x;
+                        const dy = rocket.y - enemy.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        enemy.x += (dx / distance) * enemy.speed;
+                        enemy.y += (dy / distance) * enemy.speed;
+                        break;
+                    case 'zigzag':
+                        enemy.x -= enemy.speed;
+                        enemy.y = enemy.initialY + Math.sin(enemy.x * enemy.frequency) * enemy.amplitude;
+                        break;
+                    case 'straight':
+                        enemy.x -= enemy.speed;
+                        break;
+                    case 'random':
+                        enemy.x -= enemy.speed;
+                        enemy.y += (Math.random() - 0.5) * 5;
+                        if (enemy.y < 0) enemy.y = 0;
+                        if (enemy.y > canvasHeight) enemy.y = canvasHeight;
+                        break;
+                }
+
+                if (enemy.x < -30) {
+                    enemies.splice(index, 1);
+                }
+
+                if (Math.abs(enemy.x - rocket.x) < 30 && Math.abs(enemy.y - rocket.y) < 30) {
+                    if (activePowerUp) {
+                        enemies.splice(index, 1);
+                        score += 10;
+                        for (let i = 0; i < 20; i++) {
+                            createParticle(enemy.x, enemy.y, [255, 0, 0]);
+                        }
+                    } else {
+                        gameOver();
+                    }
+                }
             });
 
-            stars = stars.filter(star => star.x > 0);
-
-            enemies.forEach(enemy => {
-                enemy.x -= enemy.speed;
-            });
-
-            enemies = enemies.filter(enemy => enemy.x + enemy.width > 0);
-
-            powerUps.forEach(powerUp => {
+            powerUps.forEach((powerUp, index) => {
                 powerUp.x -= powerUp.speed;
+                if (powerUp.x < -30) {
+                    powerUps.splice(index, 1);
+                }
+
+                if (Math.abs(powerUp.x - rocket.x) < 30 && Math.abs(powerUp.y - rocket.y) < 30) {
+                    activePowerUp = powerUp.type;
+                    powerUpTimer = 10 * 60; // 10 seconds * 60 fps
+                    powerUps.splice(index, 1);
+                }
             });
 
-            powerUps = powerUps.filter(powerUp => powerUp.x + powerUp.width > 0);
-
-            particles.forEach(particle => {
-                particle.x += particle.speedX;
-                particle.y += particle.speedY;
-                particle.life--;
+            stars.forEach((star, index) => {
+                star.x -= star.speed;
+                star.y += gameTime < 30 * 60 ? 0.5 : 0; // Move stars down during launch
+                if (star.x < -30 || star.y > canvasHeight) {
+                    stars.splice(index, 1);
+                }
             });
-
-            particles = particles.filter(particle => particle.life > 0);
 
             if (activePowerUp) {
                 powerUpTimer--;
                 if (powerUpTimer <= 0) {
                     activePowerUp = null;
                 }
-            }
 
-            const hitbox = {
-                x: rocket.x + 5,
-                y: rocket.y + 5,
-                width: rocket.width - 10,
-                height: rocket.height - 10
-            };
-
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                if (
-                    hitbox.x < enemies[i].x + enemies[i].width &&
-                    hitbox.x + hitbox.width > enemies[i].x &&
-                    hitbox.y < enemies[i].y + enemies[i].height &&
-                    hitbox.y + hitbox.height > enemies[i].y
-                ) {
-                    if (activePowerUp !== 'invincibility') {
-                        gameOver();
-                        return;
-                    } else {
-                        enemies.splice(i, 1);
-                        score += 20;
-                        for (let j = 0; j < 20; j++) {
-                            createParticle(enemies[i].x, enemies[i].y, [255, 0, 0]);
-                        }
-                    }
+                let particleColor;
+                let isLaser = false;
+                switch(activePowerUp) {
+                    case '🔫':
+                        particleColor = [0, 0, 255]; // Blue
+                        isLaser = true;
+                        break;
+                    case '🔥':
+                        particleColor = [255, 0, 0]; // Red
+                        isLaser = true;
+                        break;
+                    case '❄️':
+                        particleColor = [255, 255, 255]; // White
+                        break;
                 }
-            }
 
-            for (let i = powerUps.length - 1; i >= 0; i--) {
-                if (
-                    hitbox.x < powerUps[i].x + powerUps[i].width &&
-                    hitbox.x + hitbox.width > powerUps[i].x &&
-                    hitbox.y < powerUps[i].y + powerUps[i].height &&
-                    hitbox.y + hitbox.height > powerUps[i].y
-                ) {
-                    activePowerUp = powerUps[i].type;
-                    powerUpTimer = 300;
-                    powerUps.splice(i, 1);
-                    playSoundEffect(powerUpSound);
-                    score += 50;
-                }
-            }
+                createParticle(rocket.x + 20, rocket.y, particleColor, isLaser);
 
-            particles.forEach(particle => {
-                enemies.forEach((enemy, index) => {
-                    if (Math.abs(enemy.x - particle.x) < 15 && Math.abs(enemy.y - particle.y) < 15) {
-                        enemies.splice(index, 1);
-                        score += 10;
-                        for (let i = 0; i < 20; i++) {
-                            createParticle(enemy.x, enemy.y, [255, 0, 0]);
-                        }
+                particles.forEach(particle => {
+                    if (particle.velocity.x > 0) {
+                        enemies.forEach((enemy, index) => {
+                            if (Math.abs(enemy.x - particle.x) < 15 && Math.abs(enemy.y - particle.y) < 15) {
+                                enemies.splice(index, 1);
+                                score += 10;
+                                for (let i = 0; i < 20; i++) {
+                                    createParticle(enemy.x, enemy.y, particleColor);
+                                }
+                            }
+                        });
                     }
                 });
-            });
+            }
 
             if (Math.random() < 0.02) createEnemy();
             if (Math.random() < 0.005) createPowerUp();
             if (Math.random() < 0.1) createStar();
-
             score++;
         }
 
         function draw() {
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
+            const transitionProgress = Math.min(gameTime / (60 * 60), 1); // 60 seconds transition
             const skyBlue = [135, 206, 235];
-            const spaceBlue = [0, 0, 50];
-            const transitionProgress = Math.min(gameTime / (30 * 60), 1);
-
+            const spaceBlue = [0, 0, 51];
+            
             const r = Math.floor(skyBlue[0] + (spaceBlue[0] - skyBlue[0]) * transitionProgress);
             const g = Math.floor(skyBlue[1] + (spaceBlue[1] - skyBlue[1]) * transitionProgress);
             const b = Math.floor(skyBlue[2] + (spaceBlue[2] - skyBlue[2]) * transitionProgress);
@@ -400,8 +455,6 @@
             shareButton.style.display = 'inline-block';
             updateHighScores();
             displayHighScores();
-            backgroundMusic.pause();
-            backgroundMusic.currentTime = 0;
         }
 
         function handleInput(e) {
@@ -416,7 +469,6 @@
             gameState = 'playing';
             menu.style.display = 'none';
             resetGame();
-            toggleMusic();
             gameLoop();
         }
 
@@ -442,39 +494,26 @@
             shareCtx.drawImage(canvas, 0, 0);
             shareCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             shareCtx.fillRect(0, canvasHeight, canvasWidth, 50);
-            shareCtx.fillStyle = 'white';
+            shareCtx.fillStyle = '#fff';
             shareCtx.font = '20px Arial';
-            shareCtx.textAlign = 'center';
-            shareCtx.fillText(`Score: ${score}`, canvasWidth / 2, canvasHeight + 30);
+            shareCtx.fillText(`Score: ${score}`, 10, canvasHeight + 30);
 
-            shareCanvas.toBlob(function(blob) {
-                const file = new File([blob], "space-rocket-score.png", { type: "image/png" });
-                const filesArray = [file];
-                
-                if (navigator.share && navigator.canShare({ files: filesArray })) {
-                    navigator.share({
-                        files: filesArray,
-                        title: 'Space Rocket Adventure Score',
-                        text: `I scored ${score} points in Space Rocket Adventure!`
-                    }).then(() => console.log('Share was successful.'))
-                    .catch((error) => console.log('Sharing failed', error));
-                } else {
-                    console.log("Web Share API is not supported in your browser.");
-                    // Fallback: You could implement a different sharing method here
-                }
-            });
+            const shareDataUrl = shareCanvas.toDataURL();
+            const shareWindow = window.open();
+            shareWindow.document.write('<img src="' + shareDataUrl + '" alt="Game Score"/>');
+            shareWindow.document.write('<p>Right-click on the image and select "Save image as..." to save and share your score!</p>');
         }
 
         startButton.addEventListener('click', startGame);
         restartButton.addEventListener('click', startGame);
         shareButton.addEventListener('click', shareScore);
-        musicToggle.addEventListener('change', toggleMusic);
 
-        window.addEventListener('keydown', handleInput);
-        window.addEventListener('keyup', handleInput);
+        document.addEventListener('keydown', handleInput);
+        document.addEventListener('keyup', handleInput);
         canvas.addEventListener('touchstart', handleInput);
         canvas.addEventListener('touchend', handleInput);
 
+        // Initial display of high scores
         displayHighScores();
     </script>
 </body>
