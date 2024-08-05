@@ -44,7 +44,7 @@
 <body>
     <canvas id="gameCanvas"></canvas>
     <div id="menu">
-        <h1>Space Rocket Adventure</h1>
+        <h1>🚀Space Emojis🚀</h1>
         <button id="startButton">Start Game</button>
         <button id="restartButton" style="display: none;">Restart Game</button>
         <div id="highScores"></div>
@@ -76,7 +76,7 @@
         const powerUps = [];
         const stars = [];
         const particles = [];
-        const spaceObjects = ['✨', '🛰️', '🌏', '🌕', '🌍', '🌎', '☄️', '🪐', '🌑'];
+        const spaceObjects = ['✨', '🌕', '🌎', '☄️', '🪐', '🌑'];
         const cloudObjects = ['☁️'];
 
         let score = 0;
@@ -186,7 +186,7 @@
             ctx.fillText('🚀', rocket.x - 20, rocket.y + 15);
 
             if (rocket.flameActive) {
-                ctx.font = '25px Arial';
+                ctx.font = '30px Arial';
                 ctx.fillText('🔥', rocket.x - 45 + Math.random() * 5, rocket.y + 15 + Math.random() * 5);
             }
         }
@@ -200,7 +200,7 @@
 
         function drawPowerUps() {
             powerUps.forEach(powerUp => {
-                ctx.font = '30px Arial';
+                ctx.font = '20px Arial';
                 ctx.fillText(powerUp.type, powerUp.x, powerUp.y);
             });
         }
