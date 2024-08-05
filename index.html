@@ -14,12 +14,9 @@
             height: 100vh;
             background-color: #000;
             font-family: Arial, sans-serif;
-            overflow: hidden;
         }
         #gameCanvas {
             border: 2px solid #fff;
-            max-width: 98vw;
-            max-height: 98vh;
         }
         #menu {
             position: absolute;
@@ -29,8 +26,6 @@
             text-align: center;
             color: #fff;
             font-size: 24px;
-            max-height: 80vh;
-            overflow-y: auto;
         }
         button {
             font-size: 20px;
@@ -64,25 +59,12 @@
         const highScoresDiv = document.getElementById('highScores');
         const shareButton = document.getElementById('shareButton');
 
-        let canvasWidth, canvasHeight;
-
-        function resizeCanvas() {
-            canvasWidth = Math.min(window.innerWidth * 0.98, window.innerHeight * 0.98 * (16/9));
-            canvasHeight = canvasWidth * (9/16);
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
-            // Adjust game elements based on new canvas size
-            if (rocket) {
-                rocket.y = canvasHeight / 2;
-            }
-        }
-
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        canvas.width = 400;
+        canvas.height = 600;
 
         const rocket = {
             x: 50,
-            y: canvasHeight / 2,
+            y: canvas.height / 2,
             radius: 20,
             velocity: 0,
             gravity: 0.2,
@@ -110,8 +92,8 @@
         function createEnemy() {
             const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
             let enemy = {
-                x: canvasWidth,
-                y: Math.random() * (canvasHeight - 40),
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 40),
                 type: type,
                 speed: 2 + Math.random() * 2
             };
@@ -142,8 +124,8 @@
         function createPowerUp() {
             const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
             powerUps.push({
-                x: canvasWidth,
-                y: Math.random() * (canvasHeight - 40),
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 40),
                 type: type,
                 speed: 1.5
             });
@@ -153,32 +135,32 @@
             if (gameTime < 30 * 60) {
                 const type = cloudObjects[Math.floor(Math.random() * cloudObjects.length)];
                 stars.push({
-                    x: canvasWidth,
-                    y: Math.random() * canvasHeight,
+                    x: canvas.width,
+                    y: Math.random() * canvas.height,
                     type: type,
                     speed: 0.5 + Math.random() * 1.5,
                     size: 10 + Math.random() * 20,
-                    layer: Math.floor(Math.random() * 3)
+                    layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
                 });
             } else {
-                if (Math.random() < 0.05) {  // 5% chance for emoji stars
+                if (Math.random() < 0.4) {  // 40% chance for emoji stars
                     const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
                     stars.push({
-                        x: canvasWidth,
-                        y: Math.random() * canvasHeight,
+                        x: canvas.width,
+                        y: Math.random() * canvas.height,
                         type: type,
                         speed: 0.5 + Math.random() * 1.5,
                         size: 10 + Math.random() * 20,
-                        layer: Math.floor(Math.random() * 3)
+                        layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
                     });
-                } else {  // 95% chance for white dot stars
+                } else {  // 60% chance for white dot stars
                     stars.push({
-                        x: canvasWidth,
-                        y: Math.random() * canvasHeight,
+                        x: canvas.width,
+                        y: Math.random() * canvas.height,
                         type: 'dot',
                         speed: 0.5 + Math.random() * 1.5,
                         size: 1 + Math.random() * 2,
-                        layer: Math.floor(Math.random() * 3)
+                        layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
                     });
                 }
             }
@@ -280,8 +262,8 @@
             }
             rocket.y += rocket.velocity;
 
-            if (rocket.y + rocket.radius > canvasHeight) {
-                rocket.y = canvasHeight - rocket.radius;
+            if (rocket.y + rocket.radius > canvas.height) {
+                rocket.y = canvas.height - rocket.radius;
                 rocket.velocity = 0;
             }
 
@@ -314,7 +296,7 @@
                         enemy.x -= enemy.speed;
                         enemy.y += (Math.random() - 0.5) * 5;
                         if (enemy.y < 0) enemy.y = 0;
-                        if (enemy.y > canvasHeight) enemy.y = canvasHeight;
+                        if (enemy.y > canvas.height) enemy.y = canvas.height;
                         break;
                 }
 
@@ -343,7 +325,7 @@
 
                 if (Math.abs(powerUp.x - rocket.x) < 30 && Math.abs(powerUp.y - rocket.y) < 30) {
                     activePowerUp = powerUp.type;
-                    powerUpTimer = 10 * 60; // 10 seconds * 60 fps
+                    powerUpTimer = 30 * 60; // 30 seconds * 60 fps
                     powerUps.splice(index, 1);
                 }
             });
@@ -351,7 +333,7 @@
             stars.forEach((star, index) => {
                 star.x -= star.speed;
                 star.y += gameTime < 30 * 60 ? 0.5 : 0; // Move stars down during launch
-                if (star.x < -30 || star.y > canvasHeight) {
+                if (star.x < -30 || star.y > canvas.height) {
                     stars.splice(index, 1);
                 }
             });
@@ -397,7 +379,7 @@
 
             if (Math.random() < 0.02) createEnemy();
             if (Math.random() < 0.005) createPowerUp();
-            if (Math.random() < 0.1) createStar();
+            if (Math.random() < 0.1) createStar(); // Reduced frequency of star creation
             score++;
         }
 
@@ -410,12 +392,12 @@
             const g = Math.floor(skyBlue[1] + (spaceBlue[1] - skyBlue[1]) * transitionProgress);
             const b = Math.floor(skyBlue[2] + (spaceBlue[2] - skyBlue[2]) * transitionProgress);
 
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
             gradient.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
-            gradient.addColorStop(1, `rgb(${Math.max(0, r-20)}, ${Math.max(0, g-20)}, ${Math.max(0, b-20)})`);
+            gradient.addColorStop(1, `rgb(${Math.max(r-20, 0)}, ${Math.max(g-20, 0)}, ${Math.max(b-20, 0)})`);
 
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             drawStars();
             drawRocket();
@@ -435,7 +417,7 @@
         }
 
         function resetGame() {
-            rocket.y = canvasHeight / 2;
+            rocket.y = canvas.height / 2;
             rocket.velocity = 0;
             enemies.length = 0;
             powerUps.length = 0;
@@ -486,22 +468,29 @@
         }
 
         function shareScore() {
+            const canvas = document.getElementById('gameCanvas');
+            const dataUrl = canvas.toDataURL();
+            const img = new Image();
+            img.src = dataUrl;
+
             const shareCanvas = document.createElement('canvas');
-            shareCanvas.width = canvasWidth;
-            shareCanvas.height = canvasHeight + 50;
+            shareCanvas.width = canvas.width;
+            shareCanvas.height = canvas.height + 50;
             const shareCtx = shareCanvas.getContext('2d');
 
-            shareCtx.drawImage(canvas, 0, 0);
-            shareCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            shareCtx.fillRect(0, canvasHeight, canvasWidth, 50);
-            shareCtx.fillStyle = '#fff';
-            shareCtx.font = '20px Arial';
-            shareCtx.fillText(`Score: ${score}`, 10, canvasHeight + 30);
+            img.onload = function() {
+                shareCtx.drawImage(img, 0, 0);
+                shareCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                shareCtx.fillRect(0, canvas.height, canvas.width, 50);
+                shareCtx.fillStyle = '#fff';
+                shareCtx.font = '20px Arial';
+                shareCtx.fillText(`Score: ${score}`, 10, canvas.height + 30);
 
-            const shareDataUrl = shareCanvas.toDataURL();
-            const shareWindow = window.open();
-            shareWindow.document.write('<img src="' + shareDataUrl + '" alt="Game Score"/>');
-            shareWindow.document.write('<p>Right-click on the image and select "Save image as..." to save and share your score!</p>');
+                const shareDataUrl = shareCanvas.toDataURL();
+                const shareWindow = window.open();
+                shareWindow.document.write('<img src="' + shareDataUrl + '" alt="Game Score"/>');
+                shareWindow.document.write('<p>Right-click on the image and select "Save image as..." to save and share your score!</p>');
+            };
         }
 
         startButton.addEventListener('click', startGame);
@@ -512,9 +501,6 @@
         document.addEventListener('keyup', handleInput);
         canvas.addEventListener('touchstart', handleInput);
         canvas.addEventListener('touchend', handleInput);
-
-        // Initial display of high scores
-        displayHighScores();
     </script>
 </body>
 </html>
