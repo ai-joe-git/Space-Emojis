@@ -76,7 +76,7 @@
         const powerUps = [];
         const stars = [];
         const particles = [];
-        const spaceObjects = ['💫', '⭐', '🌟', '✨', '🌞', '🌝', '🌛', '🌜', '🌀', '☄️', '🪐', '🌑'];
+        const spaceObjects = ['✨', '⭐', '🌟', '🛰️', '🌏', '🌝', '🌐', '🌍', '🌎', '☄️', '🪐', '🌑'];
         const cloudObjects = ['☁️'];
 
         let score = 0;
@@ -101,7 +101,7 @@
             switch(type) {
                 case '🛸':
                     enemy.behavior = 'chase';
-                    enemy.speed = 1.5;
+                    enemy.speed = 2.5;
                     break;
                 case '👾':
                     enemy.behavior = 'zigzag';
@@ -143,7 +143,7 @@
                     layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
                 });
             } else {
-                if (Math.random() < 0.4) {  // 40% chance for emoji stars
+                if (Math.random() < 0.1) {  // 40% chance for emoji stars
                     const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
                     stars.push({
                         x: canvas.width,
