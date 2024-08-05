@@ -102,7 +102,7 @@
                 case '🛸':
                     enemy.behavior = 'chase';
                     enemy.speed = 2.5;
-                    enemy.frequency = 0.05;
+                    enemy.frequency = 0.01;
                     break;
                 case '👾':
                     enemy.behavior = 'zigzag';
@@ -144,7 +144,7 @@
                     layer: Math.floor(Math.random() * 3)  // 0: far, 1: middle, 2: close
                 });
             } else {
-                if (Math.random() < 0.1) {  // 40% chance for emoji stars
+                if (Math.random() < 0.05) {  // 40% chance for emoji stars
                     const type = spaceObjects[Math.floor(Math.random() * spaceObjects.length)];
                     stars.push({
                         x: canvas.width,
@@ -187,7 +187,7 @@
 
             if (rocket.flameActive) {
                 ctx.font = '30px Arial';
-                ctx.fillText('🔥', rocket.x - 45 + Math.random() * 5, rocket.y + 15 + Math.random() * 5);
+                ctx.fillText('🔥🔥', rocket.x - 45 + Math.random() * 5, rocket.y + 15 + Math.random() * 5);
             }
         }
 
