@@ -86,7 +86,7 @@
         let gameTime = 0;
         let highScores = [];
 
-        const enemyTypes = ['👾', '👽', '🦇', '🛸'];
+        const enemyTypes = ['👾', '🛰️', '👻', '🛸'];
         const powerUpTypes = ['🔫', '🔥', '❄️'];
 
         function createEnemy() {
@@ -110,10 +110,10 @@
                     enemy.frequency = 0.05;
                     enemy.initialY = enemy.y;
                     break;
-                case '👽':
+                case '🛰️':
                     enemy.behavior = 'straight';
                     break;
-                case '🦇':
+                case '👻':
                     enemy.behavior = 'random';
                     enemy.speed = 3 + Math.random() * 2;
                     break;
